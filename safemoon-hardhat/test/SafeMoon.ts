@@ -8,11 +8,8 @@ describe("SafeMoon Test", function () {
     const decimalUsdt = 18;
     const decimalEth = 18;
 
-    let usdtAddr: any;
-    let wbnbAddr: any;
-    let uniswapV2FactoryAddr: any;
-    let uniswapV2Router02Addr: any;
-    let deployer:any, user0, user1, user2, user3, user4;
+    let usdtAddr: any, wbnbAddr, uniswapV2FactoryAddr, uniswapV2Router02Addr, safeMoonAddr;
+    let deployer: any, user0, user1, user2, user3, user4;
 
     it("init params", async function () {
         [deployer, user0, user1, user2, user3, user4] = await ethers.getSigners();
@@ -39,11 +36,20 @@ describe("SafeMoon Test", function () {
         await uniswapV2Router02.deployed();
         uniswapV2Router02Addr = uniswapV2Router02.address;
 
+        const SafeMoon = await ethers.getContractFactory("SafeMoon");
+        const safeMoon = await SafeMoon.deploy(uniswapV2Router02Addr);
+        await safeMoon.deployed();
+        safeMoonAddr = safeMoon.address;
+
         //log
         console.log("deployer:%s", deployer.address);
         console.log("usdtAddr:%s", usdtAddr);
         console.log("wbnbAddr:%s", wbnbAddr);
         console.log("uniswapV2FactoryAddr:%s", uniswapV2FactoryAddr);
         console.log("uniswapV2Router02Addr:%s", uniswapV2Router02Addr);
+        console.log("safeMoonAddr:%s", safeMoonAddr);
     });
+
+
+
 });

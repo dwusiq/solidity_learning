@@ -43,20 +43,20 @@ contract SafeMoon is Context, IERC20, Ownable {
     string private _symbol = "SAFEMOON";
     uint8 private _decimals = 9;
 
-    uint256 public _taxFee = 5;//转账收取的手续费，这部分手续费会直接销毁，进而导致_rTotal减少，也就是总量的通缩
-    uint256 private _previousTaxFee = _taxFee;//上一次设置的手续费，是个历史记录
+    uint256 public _taxFee = 5; //转账收取的手续费，这部分手续费会直接销毁，进而导致_rTotal减少，也就是总量的通缩
+    uint256 private _previousTaxFee = _taxFee; //上一次设置的手续费，是个历史记录
 
-    uint256 public _liquidityFee = 5;//转账收取的流动性手续费，这部分手续费会添加到uniswap的交易对里
-    uint256 private _previousLiquidityFee = _liquidityFee;//上一次设置的手续费，是个历史记录
+    uint256 public _liquidityFee = 5; //转账收取的流动性手续费，这部分手续费会添加到uniswap的交易对里
+    uint256 private _previousLiquidityFee = _liquidityFee; //上一次设置的手续费，是个历史记录
 
-    IUniswapV2Router02 public immutable uniswapV2Router;//uniswap的路由器，用于添加流动性
-    address public immutable uniswapV2Pair;//在uniswap的创建的SafeMoon-ETH交易对
+    IUniswapV2Router02 public immutable uniswapV2Router; //uniswap的路由器，用于添加流动性
+    address public immutable uniswapV2Pair; //在uniswap的创建的SafeMoon-ETH交易对
 
-    bool inSwapAndLiquify;//用于lockTheSwap这个modifier，用来加锁的
-    bool public swapAndLiquifyEnabled = true;//开关，要不要将流动性手续费添加到uniswap的交易对里
+    bool inSwapAndLiquify; //用于lockTheSwap这个modifier，用来加锁的
+    bool public swapAndLiquifyEnabled = true; //开关，要不要将流动性手续费添加到uniswap的交易对里
 
-    uint256 public _maxTxAmount = 5000000 * 10**6 * 10**9;//每次转账最多可转多少代币
-    uint256 private numTokensSellToAddToLiquidity = 500000 * 10**6 * 10**9;//当累积的流动性手续费大于这个值得时候，才会去uniswap添加流动性
+    uint256 public _maxTxAmount = 5000000 * 10**6 * 10**9; //每次转账最多可转多少代币
+    uint256 private numTokensSellToAddToLiquidity = 500000 * 10**6 * 10**9; //当累积的流动性手续费大于这个值得时候，才会去uniswap添加流动性
 
     event MinTokensBeforeSwapUpdated(uint256 minTokensBeforeSwap);
     event SwapAndLiquifyEnabledUpdated(bool enabled);
@@ -72,12 +72,16 @@ contract SafeMoon is Context, IERC20, Ownable {
         inSwapAndLiquify = false;
     }
 
-    constructor() public {
+    constructor(address routerAddr) public {
+        require(address(0) != routerAddr, "address of router must be input");
         _rOwned[_msgSender()] = _rTotal;
 
-        IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(
-            0x05fF2B0DB69458A0750badebc4f9e13aDd608C7F
-        );
+        // TODO 原来直接写死router地址，调试时改成参数传进
+        // IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(
+        //     0x05fF2B0DB69458A0750badebc4f9e13aDd608C7F
+        // );
+        IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(routerAddr);
+
         // Create a uniswap pair for this new token
         uniswapV2Pair = IUniswapV2Factory(_uniswapV2Router.factory())
             .createPair(address(this), _uniswapV2Router.WETH());
