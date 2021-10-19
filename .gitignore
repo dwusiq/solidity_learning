@@ -1,0 +1,4 @@
+safemoon-hardhat/artifacts/
+safemoon-hardhat/node_modules/
+safemoon-hardhat/yarn.lock
+safemoon-hardhat/cache/solidity-files-cache.json
