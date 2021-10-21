@@ -112,8 +112,12 @@ contract SafeMoon is Context, IERC20, Ownable {
         return _tTotal;
     }
 
+    //根据地址查询余额
     function balanceOf(address account) public view override returns (uint256) {
+        //如果在分红黑名单，直接返回用户的对外展示余额
         if (_isExcluded[account]) return _tOwned[account];
+
+        //用户对外展示余额=对内余额/内外余额比例
         return tokenFromReflection(_rOwned[account]);
     }
 
@@ -225,6 +229,7 @@ contract SafeMoon is Context, IERC20, Ownable {
         }
     }
 
+    //根据对内余额映射对外余额的值。用户对外展示余额=对内余额/内外余额比例
     function tokenFromReflection(uint256 rAmount)
         public
         view
@@ -311,11 +316,13 @@ contract SafeMoon is Context, IERC20, Ownable {
     //to recieve ETH from uniswapV2Router when swaping
     receive() external payable {}
 
+    //
     function _reflectFee(uint256 rFee, uint256 tFee) private {
         _rTotal = _rTotal.sub(rFee);
         _tFeeTotal = _tFeeTotal.add(tFee);
     }
 
+    //根据转账金额计算：对内转账金额、对内转账实际到账金额、对内交易费、对外展示金额实际到账金额、交易费、流动池手续费
     function _getValues(uint256 tAmount)
         private
         view
@@ -328,11 +335,14 @@ contract SafeMoon is Context, IERC20, Ownable {
             uint256
         )
     {
+        //根据转账金额计算：对外展示金额实际到账金额、交易费、流动池手续费
         (
             uint256 tTransferAmount,
             uint256 tFee,
             uint256 tLiquidity
         ) = _getTValues(tAmount);
+
+        //计算：对内转账金额、对内转账实际到账金额、对内交易费
         (uint256 rAmount, uint256 rTransferAmount, uint256 rFee) = _getRValues(
             tAmount,
             tFee,
@@ -349,6 +359,7 @@ contract SafeMoon is Context, IERC20, Ownable {
         );
     }
 
+    //根据转账金额计算：对外展示金额实际到账金额、交易费、流动池手续费
     function _getTValues(uint256 tAmount)
         private
         view
@@ -364,6 +375,7 @@ contract SafeMoon is Context, IERC20, Ownable {
         return (tTransferAmount, tFee, tLiquidity);
     }
 
+    //计算：对内转账金额、对内转账实际到账金额、对内交易费
     function _getRValues(
         uint256 tAmount,
         uint256 tFee,
@@ -385,15 +397,22 @@ contract SafeMoon is Context, IERC20, Ownable {
         return (rAmount, rTransferAmount, rFee);
     }
 
+    //获取余额的比例：对内总额与对外总额的比例=对内总余额/对外总余额
     function _getRate() private view returns (uint256) {
         (uint256 rSupply, uint256 tSupply) = _getCurrentSupply();
         return rSupply.div(tSupply);
     }
 
+    //获取当前对内和对外的总余额
     function _getCurrentSupply() private view returns (uint256, uint256) {
         uint256 rSupply = _rTotal;
         uint256 tSupply = _tTotal;
+
+        //遍历分红黑名单数组所有地址
+        //所有参与分红用户[对内]当前余额总和 = [对内]发行总额-分红黑名单用户余额总和
+        //所有参与分红用户[对外]当前余额总和 = [对外]发行总额-分红黑名单用户余额总和
         for (uint256 i = 0; i < _excluded.length; i++) {
+            //如果当前总余额小于黑名单用户的余额。则直接返回总发行量
             if (
                 _rOwned[_excluded[i]] > rSupply ||
                 _tOwned[_excluded[i]] > tSupply
@@ -401,22 +420,27 @@ contract SafeMoon is Context, IERC20, Ownable {
             rSupply = rSupply.sub(_rOwned[_excluded[i]]);
             tSupply = tSupply.sub(_tOwned[_excluded[i]]);
         }
+        //如果对内发行总额除以对外发行总额的结果大于当前余额，则直接返回总发行量，否则返回当前余额
         if (rSupply < _rTotal.div(_tTotal)) return (_rTotal, _tTotal);
         return (rSupply, tSupply);
     }
 
+    //将流动性手续费加入到当前合约的余额中
     function _takeLiquidity(uint256 tLiquidity) private {
         uint256 currentRate = _getRate();
         uint256 rLiquidity = tLiquidity.mul(currentRate);
         _rOwned[address(this)] = _rOwned[address(this)].add(rLiquidity);
+        // TODO 为什么黑名单就要将流动性手续费加到合约的外部余额？
         if (_isExcluded[address(this)])
             _tOwned[address(this)] = _tOwned[address(this)].add(tLiquidity);
     }
 
+    //根据转账金额计算交易费
     function calculateTaxFee(uint256 _amount) private view returns (uint256) {
         return _amount.mul(_taxFee).div(10**2);
     }
 
+    //根据转账金额计算流动性手续费
     function calculateLiquidityFee(uint256 _amount)
         private
         view
@@ -425,6 +449,7 @@ contract SafeMoon is Context, IERC20, Ownable {
         return _amount.mul(_liquidityFee).div(10**2);
     }
 
+    //将交易费和流动池的费设置为0
     function removeAllFee() private {
         if (_taxFee == 0 && _liquidityFee == 0) return;
 
@@ -474,6 +499,7 @@ contract SafeMoon is Context, IERC20, Ownable {
         // tokens that we need to initiate a swap + liquidity lock?
         // also, don't get caught in a circular liquidity event.
         // also, don't swap & liquify if sender is uniswap pair.
+        //获取当前合约拥有的safemoon余额,如果到达指定值并允许添加流动性，则往uniswap添加流动性
         uint256 contractTokenBalance = balanceOf(address(this));
 
         if (contractTokenBalance >= _maxTxAmount) {
@@ -490,6 +516,7 @@ contract SafeMoon is Context, IERC20, Ownable {
         ) {
             contractTokenBalance = numTokensSellToAddToLiquidity;
             //add liquidity
+            //用当前合约账户下的余额从uniswap兑换eth，然后一起再添加到uniswap的流动池中
             swapAndLiquify(contractTokenBalance);
         }
 
@@ -497,6 +524,7 @@ contract SafeMoon is Context, IERC20, Ownable {
         bool takeFee = true;
 
         //if any account belongs to _isExcludedFromFee account then remove the fee
+        //直邀有一个判断是否免交易费
         if (_isExcludedFromFee[from] || _isExcludedFromFee[to]) {
             takeFee = false;
         }
@@ -505,6 +533,8 @@ contract SafeMoon is Context, IERC20, Ownable {
         _tokenTransfer(from, to, amount, takeFee);
     }
 
+    //1、将当前合约的safemoon余额对半分，取一半从uniswap兑换eth。
+    //2、用第一步兑换得到的eth与另一半safemoon一起添加到unisawp的流动性
     function swapAndLiquify(uint256 contractTokenBalance) private lockTheSwap {
         // split the contract balance into halves
         uint256 half = contractTokenBalance.div(2);
@@ -528,6 +558,7 @@ contract SafeMoon is Context, IERC20, Ownable {
         emit SwapAndLiquify(half, newBalance, otherHalf);
     }
 
+    //从uniswap中将safemoon兑换成eth
     function swapTokensForEth(uint256 tokenAmount) private {
         // generate the uniswap pair path of token -> weth
         address[] memory path = new address[](2);
@@ -546,6 +577,7 @@ contract SafeMoon is Context, IERC20, Ownable {
         );
     }
 
+    //往uniswap添加safemoon-eth交易对的流动性
     function addLiquidity(uint256 tokenAmount, uint256 ethAmount) private {
         // approve token transfer to cover all possible scenarios
         _approve(address(this), address(uniswapV2Router), tokenAmount);
@@ -562,26 +594,37 @@ contract SafeMoon is Context, IERC20, Ownable {
     }
 
     //this method is responsible for taking all fee, if takeFee is true
+    //转账函数，会根据转账地址和接收地址区分具体调用哪个函数
     function _tokenTransfer(
         address sender,
         address recipient,
         uint256 amount,
         bool takeFee
     ) private {
+        //判断是否移除所有交易费用
         if (!takeFee) removeAllFee();
-
+        //发送者在黑名单，接收者不在黑名单
         if (_isExcluded[sender] && !_isExcluded[recipient]) {
             _transferFromExcluded(sender, recipient, amount);
-        } else if (!_isExcluded[sender] && _isExcluded[recipient]) {
+        }
+        //发送者不在黑名单，接收者在黑名单
+        else if (!_isExcluded[sender] && _isExcluded[recipient]) {
             _transferToExcluded(sender, recipient, amount);
-        } else if (!_isExcluded[sender] && !_isExcluded[recipient]) {
+        }
+        //发送者和接收者都不在黑名单
+        else if (!_isExcluded[sender] && !_isExcluded[recipient]) {
             _transferStandard(sender, recipient, amount);
-        } else if (_isExcluded[sender] && _isExcluded[recipient]) {
+        }
+        //发送者和接收者都在黑名单
+        else if (_isExcluded[sender] && _isExcluded[recipient]) {
             _transferBothExcluded(sender, recipient, amount);
-        } else {
+        }
+        //其它情况正常发交易
+        else {
             _transferStandard(sender, recipient, amount);
         }
 
+        //如果这笔交易不收手续费，则交易过后要重置手续费
         if (!takeFee) restoreAllFee();
     }
 
@@ -626,6 +669,7 @@ contract SafeMoon is Context, IERC20, Ownable {
         emit Transfer(sender, recipient, tTransferAmount);
     }
 
+    //发送者在黑名单，接收者不在黑名单
     function _transferFromExcluded(
         address sender,
         address recipient,
