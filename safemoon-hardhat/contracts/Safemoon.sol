@@ -36,7 +36,7 @@ contract SafeMoon is Context, IERC20, Ownable {
 
     uint256 private constant MAX = ~uint256(0);
     uint256 private _tTotal = 1000000000 * 10**6 * 10**9; //对外展示的币总量，为1000000000 * 10**6 * 10**9，可以看出是总的蛋糕
-    uint256 private _rTotal = (MAX - (MAX % _tTotal)); //是内部实际的币总量，为2^256-(2^256%_tTotal)，是一个很大的数，可以看出是盘子的数量
+    uint256 private _rTotal = (MAX - (MAX % _tTotal)); //是内部实际的币总量（是_tTotal的N倍），为2^256-(2^256%_tTotal)，是一个很大的数，可以看出是盘子的数量【个人推算这套公式的目的是为了取值_tTotal的整倍数，而且是solidity能支持的最大值】
     uint256 private _tFeeTotal; //收取的手续费，可以看成是打碎了多少盘子，但是不影响总蛋糕_tTotal
 
     string private _name = "SafeMoon";
@@ -266,6 +266,7 @@ contract SafeMoon is Context, IERC20, Ownable {
         }
     }
 
+    //发送者和接收者都在黑名单【发送者同时减少对内对外份额，接收者同时增加对内对外的份额】
     function _transferBothExcluded(
         address sender,
         address recipient,
@@ -316,7 +317,9 @@ contract SafeMoon is Context, IERC20, Ownable {
     //to recieve ETH from uniswapV2Router when swaping
     receive() external payable {}
 
-    //
+    //对内的总额减去本次交易费，  对外展示总额不变，对外交易费总额加上本次交易费
+    //重点：这就是交易费分红的核心----对内总额减少，对外总额不变.根据公
+    //式【用户对外余额=用户内部余额/（内部总额/外部总额）】，可得出用户对外的余额增加
     function _reflectFee(uint256 rFee, uint256 tFee) private {
         _rTotal = _rTotal.sub(rFee);
         _tFeeTotal = _tFeeTotal.add(tFee);
@@ -397,13 +400,13 @@ contract SafeMoon is Context, IERC20, Ownable {
         return (rAmount, rTransferAmount, rFee);
     }
 
-    //获取余额的比例：对内总额与对外总额的比例=对内总余额/对外总余额
+    //获取余额的比例：对内总额与对外总额的比例=对内总余额/对外总余额=一个大整数
     function _getRate() private view returns (uint256) {
         (uint256 rSupply, uint256 tSupply) = _getCurrentSupply();
         return rSupply.div(tSupply);
     }
 
-    //获取当前对内和对外的总余额
+    //获取当前对内和对外的总余额（已排除掉不参与分红用户的余额）
     function _getCurrentSupply() private view returns (uint256, uint256) {
         uint256 rSupply = _rTotal;
         uint256 tSupply = _tTotal;
@@ -603,23 +606,24 @@ contract SafeMoon is Context, IERC20, Ownable {
     ) private {
         //判断是否移除所有交易费用
         if (!takeFee) removeAllFee();
-        //发送者在黑名单，接收者不在黑名单
+
+        //发送者在黑名单，接收者不在黑名单【发送者同时减少对内和对外展示的份额，接收者只增加对内份额】
         if (_isExcluded[sender] && !_isExcluded[recipient]) {
             _transferFromExcluded(sender, recipient, amount);
         }
-        //发送者不在黑名单，接收者在黑名单
+        //发送者不在黑名单，接收者在黑名单【发送者只减少对内份额，接收者同时增加对内对外的份额】
         else if (!_isExcluded[sender] && _isExcluded[recipient]) {
             _transferToExcluded(sender, recipient, amount);
         }
-        //发送者和接收者都不在黑名单
+        //发送者和接收者都不在黑名单【发送者只减少对内份额，接收者只新增对内份额】
         else if (!_isExcluded[sender] && !_isExcluded[recipient]) {
             _transferStandard(sender, recipient, amount);
         }
-        //发送者和接收者都在黑名单
+        //发送者和接收者都在黑名单【发送者同时减少对内对外份额，接收者同时增加对内对外的份额】
         else if (_isExcluded[sender] && _isExcluded[recipient]) {
             _transferBothExcluded(sender, recipient, amount);
         }
-        //其它情况正常发交易
+        //其它情况正常发交易【发送者只减少对内份额，接收者只新增对内份额】
         else {
             _transferStandard(sender, recipient, amount);
         }
@@ -628,6 +632,7 @@ contract SafeMoon is Context, IERC20, Ownable {
         if (!takeFee) restoreAllFee();
     }
 
+    //正常转账【发送者只减少对内份额，接收者只新增对内份额】
     function _transferStandard(
         address sender,
         address recipient,
@@ -648,6 +653,7 @@ contract SafeMoon is Context, IERC20, Ownable {
         emit Transfer(sender, recipient, tTransferAmount);
     }
 
+    //发送者不在黑名单，接收者在黑名单【减少发送者的对内份额，接收者的对内对外份额同时增加】
     function _transferToExcluded(
         address sender,
         address recipient,
@@ -670,6 +676,7 @@ contract SafeMoon is Context, IERC20, Ownable {
     }
 
     //发送者在黑名单，接收者不在黑名单
+    //发送者同时减少对内和对外展示的份额，接收者只增加对内份额
     function _transferFromExcluded(
         address sender,
         address recipient,
