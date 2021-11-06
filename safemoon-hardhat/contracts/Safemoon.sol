@@ -243,6 +243,8 @@ contract SafeMoon is Context, IERC20, Ownable {
         return rAmount.div(currentRate);
     }
 
+    //将用户加入分红户黑名单（不允许参与分红）
+    //加入分红黑名单前，需要根据用户的内部余额计算出用户外部展示的余额
     function excludeFromReward(address account) public onlyOwner {
         // require(account != 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D, 'We can not exclude Uniswap router.');
         require(!_isExcluded[account], "Account is already excluded");
@@ -253,6 +255,7 @@ contract SafeMoon is Context, IERC20, Ownable {
         _excluded.push(account);
     }
 
+    //将用户从分红黑名单移除（允许参与分红）
     function includeInReward(address account) external onlyOwner {
         require(_isExcluded[account], "Account is already excluded");
         for (uint256 i = 0; i < _excluded.length; i++) {
