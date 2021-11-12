@@ -256,6 +256,7 @@ contract SafeMoon is Context, IERC20, Ownable {
     }
 
     //将用户从分红黑名单移除（允许参与分红）
+    //如果用户参与分红，则将对外展示的余额清零，因为以后对外余额将通过对内余额除以内外比例计算得到
     function includeInReward(address account) external onlyOwner {
         require(_isExcluded[account], "Account is already excluded");
         for (uint256 i = 0; i < _excluded.length; i++) {
