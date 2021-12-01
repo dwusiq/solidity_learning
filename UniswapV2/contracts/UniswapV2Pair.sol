@@ -115,6 +115,7 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
         uint112 _reserve1
     ) private {
         require(
+            //uint112(-1)=2**112-1，即uint112的最大值。  uint112(-n)=2**112 - n
             balance0 <= uint112(-1) && balance1 <= uint112(-1),
             "UniswapV2: OVERFLOW"
         );
