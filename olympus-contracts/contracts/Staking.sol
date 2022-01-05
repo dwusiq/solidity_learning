@@ -11,6 +11,7 @@ import "./interfaces/IDistributor.sol";
 
 import "./types/OlympusAccessControlled.sol";
 
+//每个纪元（一个时间段）触发一次价格调整（Rebase的代币都有一个目标价格，当价格高于目标价时，就会自动增发；反之会进行通缩）
 contract OlympusStaking is OlympusAccessControlled {
     /* ========== DEPENDENCIES ========== */
 
@@ -25,19 +26,19 @@ contract OlympusStaking is OlympusAccessControlled {
     event WarmupSet(uint256 warmup);
 
     /* ========== DATA STRUCTURES ========== */
-
+    //纪元信息
     struct Epoch {
-        uint256 length; // in seconds
-        uint256 number; // since inception
-        uint256 end; // timestamp
+        uint256 length; // 时间长度（秒）【in seconds】
+        uint256 number; // 指定当前纪元的起始区块【since inception】
+        uint256 end; // 结束的时间戳【timestamp】
         uint256 distribute; // amount
     }
 
     struct Claim {
         uint256 deposit; // if forfeiting
-        uint256 gons; // staked balance
-        uint256 expiry; // end of warmup period
-        bool lock; // prevents malicious delays for claim
+        uint256 gons; // 质押的gons份额【staked balance】
+        uint256 expiry; // 热身结束【end of warmup period】
+        bool lock; // 防止恶意延迟赎回【prevents malicious delays for claim】
     }
 
     /* ========== STATE VARIABLES ========== */
@@ -51,8 +52,8 @@ contract OlympusStaking is OlympusAccessControlled {
     IDistributor public distributor;
 
     mapping(address => Claim) public warmupInfo;
-    uint256 public warmupPeriod;
-    uint256 private gonsInWarmup;
+    uint256 public warmupPeriod;//参与者的热身时长，如果用户从质押到取出的时间没超过这个值，则智能赎回本金而没有收益（由于Governor设置，单位：区块），参考：https://forum.olympusdao.finance/d/47-introduce-warm-up-for-staking
+    uint256 private gonsInWarmup;//当前在热身中的gons总额
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -72,17 +73,22 @@ contract OlympusStaking is OlympusAccessControlled {
         require(_gOHM != address(0), "Zero address: gOHM");
         gOHM = IgOHM(_gOHM);
 
-        epoch = Epoch({length: _epochLength, number: _firstEpochNumber, end: _firstEpochTime, distribute: 0});
+        epoch = Epoch({
+            length: _epochLength,
+            number: _firstEpochNumber,
+            end: _firstEpochTime,
+            distribute: 0
+        });
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
 
     /**
-     * @notice stake OHM to enter warmup
-     * @param _to address
-     * @param _amount uint
-     * @param _claim bool
-     * @param _rebasing bool
+     * @notice 质押OHM进入热身状态【stake OHM to enter warmup】
+     * @param _to address  //质押的份额归属地址（当前只能是sender）
+     * @param _amount uint //质押OHM的份额
+     * @param _claim bool  // 是否索赔
+     * @param _rebasing bool    true: 直接从当前合约转sOHM给指定地址。 false: amount转成gOHM的份额后，给指定地址铸造等额的gOHM
      * @return uint
      */
     function stake(
@@ -92,17 +98,23 @@ contract OlympusStaking is OlympusAccessControlled {
         bool _claim
     ) external returns (uint256) {
         OHM.safeTransferFrom(msg.sender, address(this), _amount);
-        _amount = _amount.add(rebase()); // add bounty if rebase occurred
+        _amount = _amount.add(rebase()); // 变基，增加赏金【add bounty if rebase occurred】
         if (_claim && warmupPeriod == 0) {
+            //不需要热身等待，直接根据stake的OHM份额转sOHM/gOHM给用户
+            //_rebasing=true:转sOHM, _rebasing=false:铸造gOHM
             return _send(_to, _amount, _rebasing);
         } else {
+            //需要热身等待，添加到热身等待
             Claim memory info = warmupInfo[_to];
             if (!info.lock) {
-                require(_to == msg.sender, "External deposits for account are locked");
+                require(
+                    _to == msg.sender,
+                    "External deposits for account are locked"
+                );
             }
 
             warmupInfo[_to] = Claim({
-                deposit: info.deposit.add(_amount),
+                deposit: info.deposit.add(_amount),//金额累加
                 gons: info.gons.add(sOHM.gonsForBalance(_amount)),
                 expiry: epoch.number.add(warmupPeriod),
                 lock: info.lock
@@ -115,7 +127,7 @@ contract OlympusStaking is OlympusAccessControlled {
     }
 
     /**
-     * @notice retrieve stake from warmup
+     * @notice 从热身中赎回自己质押的所有份额（得到sOHM或gOHM）【retrieve stake from warmup】
      * @param _to address
      * @param _rebasing bool
      * @return uint
@@ -124,7 +136,10 @@ contract OlympusStaking is OlympusAccessControlled {
         Claim memory info = warmupInfo[_to];
 
         if (!info.lock) {
-            require(_to == msg.sender, "External claims for account are locked");
+            require(
+                _to == msg.sender,
+                "External claims for accoun t are locked"
+            );
         }
 
         if (epoch.number >= info.expiry && info.expiry != 0) {
@@ -132,13 +147,14 @@ contract OlympusStaking is OlympusAccessControlled {
 
             gonsInWarmup = gonsInWarmup.sub(info.gons);
 
+            // _rebasing  true:从当前合约转sOHM份额给用户  false: 直接调用gOHM合约给用户铸造相应份额
             return _send(_to, sOHM.balanceForGons(info.gons), _rebasing);
         }
         return 0;
     }
 
     /**
-     * @notice forfeit stake and retrieve OHM
+     * @notice 从热身中赎回自己质押的所有份额（得到OHM）【forfeit stake and retrieve OHM】
      * @return uint
      */
     function forfeit() external returns (uint256) {
@@ -160,17 +176,17 @@ contract OlympusStaking is OlympusAccessControlled {
     }
 
     /**
-     * @notice redeem sOHM for OHMs
-     * @param _to address
-     * @param _amount uint
-     * @param _trigger bool
-     * @param _rebasing bool
+     * @notice 用sOHM或gOHM赎回指定份额的OHM【redeem sOHM for OHMs】
+     * @param _to address     //接收地址
+     * @param _amount uint    //赎回份额
+     * @param _trigger bool   //赎回之前是否需要变基
+     * @param _rebasing bool  // true:从用户钱包中扣除相应sOHM  false: 从用户钱包销毁gOHM
      * @return amount_ uint
      */
     function unstake(
-        address _to,
-        uint256 _amount,
-        bool _trigger,
+        address _to,   
+        uint256 _amount, 
+        bool _trigger,   
         bool _rebasing
     ) external returns (uint256 amount_) {
         amount_ = _amount;
@@ -178,6 +194,8 @@ contract OlympusStaking is OlympusAccessControlled {
         if (_trigger) {
             bounty = rebase();
         }
+
+        //判断是扣sOHM还是gOHM
         if (_rebasing) {
             sOHM.safeTransferFrom(msg.sender, address(this), _amount);
             amount_ = amount_.add(bounty);
@@ -186,52 +204,63 @@ contract OlympusStaking is OlympusAccessControlled {
             amount_ = gOHM.balanceFrom(amount_).add(bounty); // convert amount to OHM terms & add bounty
         }
 
-        require(amount_ <= OHM.balanceOf(address(this)), "Insufficient OHM balance in contract");
-        OHM.safeTransfer(_to, amount_);
+        require(
+            amount_ <= OHM.balanceOf(address(this)),
+            "Insufficient OHM balance in contract"
+        );
+        OHM.safeTransfer(_to, amount_);//转OHM给用户
     }
 
     /**
-     * @notice convert _amount sOHM into gBalance_ gOHM
+     * @notice 将sOHM兑换成gOHM【convert _amount sOHM into gBalance_ gOHM】
      * @param _to address
      * @param _amount uint
      * @return gBalance_ uint
      */
-    function wrap(address _to, uint256 _amount) external returns (uint256 gBalance_) {
+    function wrap(address _to, uint256 _amount)
+        external
+        returns (uint256 gBalance_)
+    {
         sOHM.safeTransferFrom(msg.sender, address(this), _amount);
         gBalance_ = gOHM.balanceTo(_amount);
-        gOHM.mint(_to, gBalance_);
+        gOHM.mint(_to, gBalance_);//铸造gOHM
     }
 
     /**
-     * @notice convert _amount gOHM into sBalance_ sOHM
+     * @notice 将gOHM的份额兑换回sOHM的【convert _amount gOHM into sBalance_ sOHM】
      * @param _to address
      * @param _amount uint
      * @return sBalance_ uint
      */
-    function unwrap(address _to, uint256 _amount) external returns (uint256 sBalance_) {
-        gOHM.burn(msg.sender, _amount);
+    function unwrap(address _to, uint256 _amount)
+        external
+        returns (uint256 sBalance_)
+    {
+        gOHM.burn(msg.sender, _amount);//销毁gOHM
         sBalance_ = gOHM.balanceFrom(_amount);
         sOHM.safeTransfer(_to, sBalance_);
     }
 
     /**
-     * @notice trigger rebase if epoch over
+     * @notice 如果epoch结束，触发rebase【trigger rebase if epoch over】
      * @return uint256
      */
     function rebase() public returns (uint256) {
         uint256 bounty;
+        //要求当前期未结束
         if (epoch.end <= block.timestamp) {
             sOHM.rebase(epoch.distribute, epoch.number);
 
             epoch.end = epoch.end.add(epoch.length);
             epoch.number++;
 
+            //如果配置了distributor合约地址，则mint分红奖
             if (address(distributor) != address(0)) {
-                distributor.distribute();
-                bounty = distributor.retrieveBounty(); // Will mint ohm for this contract if there exists a bounty
+                distributor.distribute();//给事先配置的分红地址mint发OHm
+                bounty = distributor.retrieveBounty(); //最终通过Treasury调用OHM给当前staking合约mint分红奖【Will mint ohm for this contract if there exists a bounty】
             }
             uint256 balance = OHM.balanceOf(address(this));
-            uint256 staked = sOHM.circulatingSupply();
+            uint256 staked = sOHM.circulatingSupply();//获取
             if (balance <= staked.add(bounty)) {
                 epoch.distribute = 0;
             } else {
@@ -244,10 +273,10 @@ contract OlympusStaking is OlympusAccessControlled {
     /* ========== INTERNAL FUNCTIONS ========== */
 
     /**
-     * @notice send staker their amount as sOHM or gOHM
-     * @param _to address
-     * @param _amount uint
-     * @param _rebasing bool
+     * @notice 从当前合约将（sOHM/gOHM）转给指定用户【send staker their amount as sOHM or gOHM】
+     * @param _to address         接收者地址
+     * @param _amount uint        转移的份额
+     * @param _rebasing bool      true: 直接从当前合约转sOHM给指定地址。 false: amount转成gOHM的份额后，给指定地址铸造等额的gOHM
      */
     function _send(
         address _to,
@@ -255,10 +284,10 @@ contract OlympusStaking is OlympusAccessControlled {
         bool _rebasing
     ) internal returns (uint256) {
         if (_rebasing) {
-            sOHM.safeTransfer(_to, _amount); // send as sOHM (equal unit as OHM)
+            sOHM.safeTransfer(_to, _amount); // 转换sOHM【send as sOHM (equal unit as OHM)】
             return _amount;
         } else {
-            gOHM.mint(_to, gOHM.balanceTo(_amount)); // send as gOHM (convert units from OHM)
+            gOHM.mint(_to, gOHM.balanceTo(_amount)); // 将OHM的份额转成gOHM的份额后，铸造相应份额的gOHM【send as gOHM (convert units from OHM)】
             return gOHM.balanceTo(_amount);
         }
     }
@@ -274,14 +303,14 @@ contract OlympusStaking is OlympusAccessControlled {
     }
 
     /**
-     * @notice total supply in warmup
+     * @notice 当前在热身中的sOHM，由gonsInWarmup折算sOHM【total supply in warmup】
      */
     function supplyInWarmup() public view returns (uint256) {
         return sOHM.balanceForGons(gonsInWarmup);
     }
 
     /**
-     * @notice seconds until the next epoch begins
+     * @notice 还有多少个区块到下一轮纪元（即本轮纪元还有多少个区块结束）【seconds until the next epoch begins】
      */
     function secondsToNextEpoch() external view returns (uint256) {
         return epoch.end.sub(block.timestamp);
@@ -290,7 +319,7 @@ contract OlympusStaking is OlympusAccessControlled {
     /* ========== MANAGERIAL FUNCTIONS ========== */
 
     /**
-     * @notice sets the contract address for LP staking
+     * @notice 设置质押LpToken的合约地址（改合约支持用户购买债券）。【sets the contract address for LP staking】
      * @param _distributor address
      */
     function setDistributor(address _distributor) external onlyGovernor {
@@ -299,7 +328,7 @@ contract OlympusStaking is OlympusAccessControlled {
     }
 
     /**
-     * @notice set warmup period for new stakers
+     * @notice 为新参与者设置热身时间，从存入到取出之间的时间如果不超过该值，则只能取回本金而没有受益【set warmup period for new stakers】
      * @param _warmupPeriod uint
      */
     function setWarmupLength(uint256 _warmupPeriod) external onlyGovernor {

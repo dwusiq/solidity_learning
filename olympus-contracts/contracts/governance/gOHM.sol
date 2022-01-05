@@ -112,7 +112,7 @@ contract gOHM is IgOHM, ERC20 {
     }
 
     /**
-        @notice converts gOHM amount to OHM
+        @notice 计算gOHM对应的OHM份额【converts gOHM amount to OHM】
         @param _amount uint
         @return uint
      */
@@ -121,7 +121,7 @@ contract gOHM is IgOHM, ERC20 {
     }
 
     /**
-        @notice converts OHM amount to gOHM
+        @notice 计算指定amount的OHM对应的gOHM【converts OHM amount to gOHM】
         @param _amount uint
         @return uint
      */

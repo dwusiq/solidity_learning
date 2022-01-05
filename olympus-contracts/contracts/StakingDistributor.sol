@@ -26,20 +26,22 @@ contract Distributor is IDistributor, OlympusAccessControlled {
     mapping(uint256 => Adjust) public adjustments;
     uint256 public override bounty;
 
-    uint256 private immutable rateDenominator = 1_000_000;
+    uint256 private immutable rateDenominator = 1_000_000;//分红比例的分母是1000000
 
     /* ====== STRUCTS ====== */
 
+   //有分红的用户地址
     struct Info {
-        uint256 rate; // in ten-thousandths ( 5000 = 0.5% )
-        address recipient;
+        uint256 rate; // 分红占比【in ten-thousandths ( 5000 = 0.5% )】
+        address recipient; //分红接收地址
     }
     Info[] public info;
 
+   //收益调整信息
     struct Adjust {
-        bool add;
-        uint256 rate;
-        uint256 target;
+        bool add;        //是否新增
+        uint256 rate;    //本次调整波动比率
+        uint256 target;  //当减少收益率时的调整后最小值，当增加收益率时的调整后最大值
     }
 
     /* ====== CONSTRUCTOR ====== */
@@ -61,19 +63,21 @@ contract Distributor is IDistributor, OlympusAccessControlled {
     /* ====== PUBLIC FUNCTIONS ====== */
 
     /**
-        @notice send epoch reward to staking contract
+        @notice 分配分红【send epoch reward to staking contract】
      */
     function distribute() external override {
         require(msg.sender == staking, "Only staking");
         // distribute rewards to each recipient
         for (uint256 i = 0; i < info.length; i++) {
             if (info[i].rate > 0) {
-                treasury.mint(info[i].recipient, nextRewardAt(info[i].rate)); // mint and send tokens
-                adjust(i); // check for adjustment
+                treasury.mint(info[i].recipient, nextRewardAt(info[i].rate)); // 按比例给每个收益用户铸币【mint and send tokens】
+                adjust(i); //  调整收集者的分红收益率【check for adjustment】
             }
         }
     }
 
+
+    //  @notice 给staking合约铸币，用于分红
     function retrieveBounty() external override returns (uint256) {
         require(msg.sender == staking, "Only staking");
         // If the distributor bounty is > 0, mint it for the staking contract.
@@ -87,21 +91,21 @@ contract Distributor is IDistributor, OlympusAccessControlled {
     /* ====== INTERNAL FUNCTIONS ====== */
 
     /**
-        @notice increment reward rate for collector
+        @notice 调整收集者的分红收益率【ncrement reward rate for collector】
      */
     function adjust(uint256 _index) internal {
         Adjust memory adjustment = adjustments[_index];
         if (adjustment.rate != 0) {
             if (adjustment.add) {
-                // if rate should increase
+                // 调整“增加收益率”的配置【if rate should increase】
                 info[_index].rate = info[_index].rate.add(adjustment.rate); // raise rate
-                if (info[_index].rate >= adjustment.target) {
+                if (info[_index].rate >= adjustment.target) {  //如果是add，则调整后的rate不能大于target
                     // if target met
                     adjustments[_index].rate = 0; // turn off adjustment
                     info[_index].rate = adjustment.target; // set to target
                 }
             } else {
-                // if rate should decrease
+                // 调整“减少收益率”的配置 【if rate should decrease】
                 if (info[_index].rate > adjustment.rate) {
                     // protect from underflow
                     info[_index].rate = info[_index].rate.sub(adjustment.rate); // lower rate
@@ -109,7 +113,7 @@ contract Distributor is IDistributor, OlympusAccessControlled {
                     info[_index].rate = 0;
                 }
 
-                if (info[_index].rate <= adjustment.target) {
+                if (info[_index].rate <= adjustment.target) { //如果是减少，则调整后的rate不能小于target
                     // if target met
                     adjustments[_index].rate = 0; // turn off adjustment
                     info[_index].rate = adjustment.target; // set to target
@@ -121,7 +125,7 @@ contract Distributor is IDistributor, OlympusAccessControlled {
     /* ====== VIEW FUNCTIONS ====== */
 
     /**
-        @notice view function for next reward at given rate
+        @notice 查看指定比率的下一个奖励金额是多少【view function for next reward at given rate】
         @param _rate uint
         @return uint
      */
@@ -130,7 +134,7 @@ contract Distributor is IDistributor, OlympusAccessControlled {
     }
 
     /**
-        @notice view function for next reward for specified address
+        @notice 查看指定地址的下一个奖励金额是多少【view function for next reward for specified address】
         @param _recipient address
         @return uint
      */
@@ -156,9 +160,9 @@ contract Distributor is IDistributor, OlympusAccessControlled {
     }
 
     /**
-        @notice adds recipient for distributions
-        @param _recipient address
-        @param _rewardRate uint
+        @notice 添加分配OHM的接收地址【adds recipient for distributions】
+        @param _recipient address  接收地址
+        @param _rewardRate uint   收益比例
      */
     function addRecipient(address _recipient, uint256 _rewardRate) external override onlyGovernor {
         require(_recipient != address(0), "Zero address: Recipient");
@@ -167,7 +171,7 @@ contract Distributor is IDistributor, OlympusAccessControlled {
     }
 
     /**
-        @notice removes recipient for distributions
+        notice 将用户从分红用户列表中移除【removes recipient for distributions】
         @param _index uint
      */
     function removeRecipient(uint256 _index) external override {
@@ -181,15 +185,15 @@ contract Distributor is IDistributor, OlympusAccessControlled {
     }
 
     /**
-        @notice set adjustment info for a collector's reward rate
-        @param _index uint
-        @param _add bool
-        @param _rate uint
-        @param _target uint
+        @notice 调整用户的分红比率的下次变更参数（在distribute分配分红后，会按这里设置的ajust参数调整下一次分红比率）【set adjustment info for a collector's reward rate】
+        @param _index uint   info数组中的索引id
+        @param _add bool     是增加分红收益还是减少  true:增加分红收益  false:减少分红收益
+        @param _rate uint    本次调整的比率（新增或减少）
+        @param _target uint  如果是新增，则新增后的rate不能大于_target,如果是减少，则减少后的rate不能小于_target
      */
     function setAdjustment(
         uint256 _index,
-        bool _add,
+        bool _add,        
         uint256 _rate,
         uint256 _target
     ) external override {
@@ -203,6 +207,7 @@ contract Distributor is IDistributor, OlympusAccessControlled {
             require(_rate <= info[_index].rate.mul(25).div(1000), "Limiter: cannot adjust by >2.5%");
         }
 
+        //如果是减少收益率，则减少的幅度不能大于当前的比率。
         if (!_add) {
             require(_rate <= info[_index].rate, "Cannot decrease rate by more than it already is");
         }

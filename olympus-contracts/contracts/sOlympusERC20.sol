@@ -30,7 +30,8 @@ contract sOlympus is IsOHM, ERC20Permit {
     }
 
     /* ========== DATA STRUCTURES ========== */
-
+    //【Rebase是指在一定周期内，当市场价格偏离基准价格或偏离基准价格一定范围时，智能合约会直接或间接
+    //增加或减少代币供应量以促使市场价格回归基准价格，通过某种设定的机制控制代币供应量以调节价格稳定】
     struct Rebase {
         uint256 epoch;
         uint256 rebase; // 18 decimals
@@ -113,10 +114,12 @@ contract sOlympus is IsOHM, ERC20Permit {
     /* ========== REBASE ========== */
 
     /**
+        TODO 目前先不清楚变基的具体细节，只知道目的是让质押者能得到OHM增产的收益
         @notice increases rOHM supply to increase staking balances relative to profit_
         @param profit_ uint256
         @return uint256
      */
+     //参考：https://docs.olympusdao.finance/main/basics/basics#what-is-a-rebase
     function rebase(uint256 profit_, uint256 epoch_) public override onlyStakingContract returns (uint256) {
         uint256 rebaseAmount;
         uint256 circulatingSupply_ = circulatingSupply();
@@ -273,8 +276,10 @@ contract sOlympus is IsOHM, ERC20Permit {
         return gOHM.balanceFrom(amount);
     }
 
-    // Staking contract holds excess sOHM
+    //获取当前sOHM的流动份额（Staking contract holds excess sOHM）
+    //在市场上流通并掌握在公众手中的硬币数量。它类似于股票市场中流动的股票
     function circulatingSupply() public view override returns (uint256) {
+        //流动资金=总sOHM供应量-staking合约的sOHM总份额+gOHM总流动性折算OHM的总价值+质押合约中处于质押热身阶段的OHM
         return
             _totalSupply.sub(balanceOf(stakingContract)).add(gOHM.balanceFrom(IERC20(address(gOHM)).totalSupply())).add(
                 IStaking(stakingContract).supplyInWarmup()

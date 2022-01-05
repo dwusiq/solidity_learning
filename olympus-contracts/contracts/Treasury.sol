@@ -289,10 +289,10 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
     }
 
     /**
-     * @notice enable permission from queue
-     * @param _status STATUS
+     * @notice 启用队列权限【enable permission from queue】
+     * @param _status 状态【STATUS】
      * @param _address address
-     * @param _calculator address
+     * @param _calculator StandardBondingCalculator合约地址
      */
     function enable(
         STATUS _status,
@@ -460,9 +460,9 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
     }
 
     /**
-     * @notice returns OHM valuation of asset
-     * @param _token address
-     * @param _amount uint256
+     * @notice 返回指定amount的某个token资产 估算价值多少的OHM【returns OHM valuation of asset】
+     * @param _token address  指定token资产合约地址
+     * @param _amount uint256 token
      * @return value_ uint256
      */
     function tokenValue(address _token, uint256 _amount) public view override returns (uint256 value_) {
