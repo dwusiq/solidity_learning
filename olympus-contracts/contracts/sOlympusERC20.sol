@@ -10,6 +10,7 @@ import "./interfaces/IgOHM.sol";
 import "./interfaces/IsOHM.sol";
 import "./interfaces/IStaking.sol";
 
+//每质押一个OHM都对应分配一个sOHM，随时可以1:1兑换回OHM
 contract sOlympus is IsOHM, ERC20Permit {
     /* ========== DEPENDENCIES ========== */
 

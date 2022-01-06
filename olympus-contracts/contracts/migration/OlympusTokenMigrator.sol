@@ -347,10 +347,10 @@ contract OlympusTokenMigrator is OlympusAccessControlled {
     }
 
     /**
-     *   @notice Migrate token from old treasury to new treasury
+     *   @notice 从旧的treasury将token份额迁移到新的treasury（这些token属于treasury协议的储备金）【Migrate token from old treasury to new treasury】
      */
     function _migrateToken(address token, bool deposit) internal {
-        uint256 balance = IERC20(token).balanceOf(address(oldTreasury));
+        uint256 balance = IERC20(token).balanceOf(address(oldTreasury));//旧的treasury中拥有的token份额
 
         uint256 excessReserves = oldTreasury.excessReserves();
         uint256 tokenValue = oldTreasury.valueOf(token, balance);

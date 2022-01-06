@@ -53,7 +53,7 @@ contract OlympusBondingCalculator is IBondingCalculator {
     function markdown(address _pair) external view override returns (uint256) {
         (uint256 reserve0, uint256 reserve1, ) = IUniswapV2Pair(_pair).getReserves();
 
-        //获取lp中当前拥有多少OHM（要求token0和token1其中一个是OHM）
+        //获取lp中当前拥有多少OHM储备（要求token0和token1其中一个是OHM）
         uint256 reserve;
         if (IUniswapV2Pair(_pair).token0() == address(OHM)) {
             reserve = reserve1;

@@ -14,6 +14,7 @@ import "./interfaces/ITreasury.sol";
 
 import "./types/OlympusAccessControlled.sol";
 
+//财政部合约(管理所有资产)
 contract OlympusTreasury is OlympusAccessControlled, ITreasury {
     /* ========== DEPENDENCIES ========== */
 
@@ -72,11 +73,11 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
     uint256 public totalDebt;
     uint256 public ohmDebt;
 
-    Queue[] public permissionQueue;
-    uint256 public immutable blocksNeededForQueue;
+    Queue[] public permissionQueue; //许可队列
+    uint256 public immutable blocksNeededForQueue; //每个许可队列要等待的区块数
 
-    bool public timelockEnabled;
-    bool public initialized;
+    bool public timelockEnabled; //是否允许时间锁
+    bool public initialized;     //是否已初始化
 
     uint256 public onChainGovernanceTimelock;
 
@@ -103,10 +104,10 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
     /* ========== MUTATIVE FUNCTIONS ========== */
 
     /**
-     * @notice allow approved address to deposit an asset for OHM
-     * @param _amount uint256
-     * @param _token address
-     * @param _profit uint256
+     * @notice 被授权的地址可以存入Token获取OHM【allow approved address to deposit an asset for OHM】
+     * @param _amount uint256   //存入的金额
+     * @param _token address    //存入的Token地址
+     * @param _profit uint256   //
      * @return send_ uint256
      */
     function deposit(
@@ -115,60 +116,70 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
         uint256 _profit
     ) external override returns (uint256 send_) {
         if (permissions[STATUS.RESERVETOKEN][_token]) {
+             //如果存入的token是储备token,则判断sender是否有RESERVE DEPOSITOR权限
             require(permissions[STATUS.RESERVEDEPOSITOR][msg.sender], notApproved);
         } else if (permissions[STATUS.LIQUIDITYTOKEN][_token]) {
+            //如果存入的token是流动性LP,则判断sender是否有LIQUIDITY DEPOSITOR权限
             require(permissions[STATUS.LIQUIDITYDEPOSITOR][msg.sender], notApproved);
         } else {
             revert(invalidToken);
         }
 
+        //将sender需要存储的token转到当前合约
         IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
 
+        //判断存入的这些token价值多少OHM
         uint256 value = tokenValue(_token, _amount);
         // mint OHM needed and store amount of rewards for distribution
         send_ = value.sub(_profit);
         OHM.mint(msg.sender, send_);
 
+        //累加储备中所有token总共价值多少OHM
         totalReserves = totalReserves.add(value);
 
         emit Deposit(_token, _amount, value);
     }
 
     /**
-     * @notice allow approved address to burn OHM for reserves
-     * @param _amount uint256
-     * @param _token address
+     * @notice 允许用户销毁OHM换回储备中的其它Token【allow approved address to burn OHM for reserves】
+     * @param _amount uint256  赎回的目标token份额
+     * @param _token address   赎回的目标token地址
      */
     function withdraw(uint256 _amount, address _token) external override {
-        require(permissions[STATUS.RESERVETOKEN][_token], notAccepted); // Only reserves can be used for redemptions
-        require(permissions[STATUS.RESERVESPENDER][msg.sender], notApproved);
-
+        // 判断目标token是否被允许作为储备Token【Only reserves can be used for redemptions】
+        require(permissions[STATUS.RESERVETOKEN][_token], notAccepted); 
+        //判断发送者是否允许提现
+        require(permissions[STATUS.RESERVESPENDER][msg.sender], notApproved); 
+        //需要提现目标token的份额折算回OHM的份额，并销毁
         uint256 value = tokenValue(_token, _amount);
         OHM.burnFrom(msg.sender, value);
-
+        //金库所有token总价值OHM减去本次提取的份额
         totalReserves = totalReserves.sub(value);
-
+        //目标token转给发送者
         IERC20(_token).safeTransfer(msg.sender, _amount);
 
         emit Withdrawal(_token, _amount, value);
     }
 
     /**
-     * @notice allow approved address to withdraw assets
+     * @notice 被授权的地址允许提取token（不会销毁OHM）【allow approved address to withdraw assets】
      * @param _token address
      * @param _amount uint256
      */
     function manage(address _token, uint256 _amount) external override {
+        //确定用户有lp管理或token的管理权限
         if (permissions[STATUS.LIQUIDITYTOKEN][_token]) {
             require(permissions[STATUS.LIQUIDITYMANAGER][msg.sender], notApproved);
         } else {
             require(permissions[STATUS.RESERVEMANAGER][msg.sender], notApproved);
         }
+        //确定目标token是被支持的token或lp
         if (permissions[STATUS.RESERVETOKEN][_token] || permissions[STATUS.LIQUIDITYTOKEN][_token]) {
             uint256 value = tokenValue(_token, _amount);
             require(value <= excessReserves(), insufficientReserves);
             totalReserves = totalReserves.sub(value);
         }
+        //token转给调用者
         IERC20(_token).safeTransfer(msg.sender, _amount);
         emit Managed(_token, _amount);
     }
@@ -179,6 +190,7 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
      * @param _amount uint256
      */
     function mint(address _recipient, uint256 _amount) external override {
+        //确定调用者有权发放奖励
         require(permissions[STATUS.REWARDMANAGER][msg.sender], notApproved);
         require(_amount <= excessReserves(), insufficientReserves);
         OHM.mint(_recipient, _amount);
@@ -280,7 +292,7 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
     }
 
     /**
-     * @notice set max debt for address
+     * @notice 设置某个地址允许的最大债务值【set max debt for address】
      * @param _address address
      * @param _limit uint256
      */
@@ -289,7 +301,7 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
     }
 
     /**
-     * @notice 启用队列权限【enable permission from queue】
+     * @notice 给指定地址设置某个权限【enable permission from queue】
      * @param _status 状态【STATUS】
      * @param _address address
      * @param _calculator StandardBondingCalculator合约地址
@@ -309,10 +321,13 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
                 bondCalculator[_address] = _calculator;
             }
 
+            //判断status中注册的地址是否包含该_address
             (bool registered, ) = indexInRegistry(_address, _status);
             if (!registered) {
+                //如果不包含，则添加
                 registry[_status].push(_address);
 
+                //该方法不允许注册lp和reserveToken两个状态 TODO 不知为何
                 if (_status == STATUS.LIQUIDITYTOKEN || _status == STATUS.RESERVETOKEN) {
                     (bool reg, uint256 index) = indexInRegistry(_address, _status);
                     if (reg) {
@@ -325,7 +340,7 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
     }
 
     /**
-     *  @notice disable permission from address
+     *  @notice 取消某个地址相对于某个角色的权限【disable permission from address】
      *  @param _status STATUS
      *  @param _toDisable address
      */
@@ -336,7 +351,7 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
     }
 
     /**
-     * @notice check if registry contains address
+     * @notice 判断指定状态中是否包含某个地址【check if registry contains address】
      * @return (bool, uint256)
      */
     function indexInRegistry(address _address, STATUS _status) public view returns (bool, uint256) {
@@ -421,7 +436,7 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
     }
 
     /**
-     * @notice cancel timelocked action
+     * @notice 取消指定index的时间锁【cancel timelocked action】
      * @param _index uint256
      */
     function nullify(uint256 _index) external onlyGovernor {
@@ -429,19 +444,21 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
     }
 
     /**
-     * @notice disables timelocked functions
+     * @notice 取消所有的时间锁【disables timelocked functions】
      */
     function disableTimelock() external onlyGovernor {
         require(timelockEnabled == true, "timelock already disabled");
         if (onChainGovernanceTimelock != 0 && onChainGovernanceTimelock <= block.number) {
+            //如果之前设置的时间锁小于当前块，直接关闭锁
             timelockEnabled = false;
         } else {
+            //如果没设置时间锁或者时间锁区块值大于当前块，则在当前块的基础上+blocksNeededForQueue的7倍  TODO 为什么
             onChainGovernanceTimelock = block.number.add(blocksNeededForQueue.mul(7)); // 7-day timelock
         }
     }
 
     /**
-     * @notice enables timelocks after initilization
+     * @notice 初始化【 timelocks after initilization】
      */
     function initialize() external onlyGovernor {
         require(initialized == false, "Already initialized");
@@ -456,11 +473,12 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
      * @return uint
      */
     function excessReserves() public view override returns (uint256) {
+        //储备总OHM价值-（OHM总供应量-总债务）
         return totalReserves.sub(OHM.totalSupply().sub(totalDebt));
     }
 
     /**
-     * @notice 返回指定amount的某个token资产 估算价值多少的OHM【returns OHM valuation of asset】
+     * @notice 指定token地址和amount 估算价值多少的OHM【returns OHM valuation of asset】
      * @param _token address  指定token资产合约地址
      * @param _amount uint256 token
      * @return value_ uint256
@@ -475,7 +493,7 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
 
     /**
      * @notice returns supply metric that cannot be manipulated by debt
-     * @dev use this any time you need to query supply
+     * @dev 在任何需要查询OHM供应的时候使用这个【use this any time you need to query supply】
      * @return uint256
      */
     function baseSupply() external view override returns (uint256) {

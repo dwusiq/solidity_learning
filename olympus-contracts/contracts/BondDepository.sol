@@ -27,28 +27,28 @@ contract OlympusBondDepository is OlympusAccessControlled {
 
   /* ======== STRUCTS ======== */
 
-  // Info about each type of bond
+  // 记录不同类型的债券信息【Info about each type of bond】
   struct Bond {
-    IERC20 principal; // token to accept as payment
-    IBondingCalculator calculator; // contract to value principal
-    Terms terms; // terms of bond
-    bool termsSet; // have terms been set
+    IERC20 principal; // 指定购买债券需支付的币种（lp）【token to accept as payment】
+    IBondingCalculator calculator; // 债券计算合约【contract to value principal】
+    Terms terms; // 债券周期信息【terms of bond】
+    bool termsSet; // 是否已设置债券周期【have terms been set】
     uint256 capacity; // capacity remaining
     bool capacityIsPayout; // capacity limit is for payout vs principal
-    uint256 totalDebt; // total debt from bond
-    uint256 lastDecay; // last block when debt was decayed
+    uint256 totalDebt; // 已销售债券总额【total debt from bond】
+    uint256 lastDecay; // 上次可售债券衰减时的区块【last block when debt was decayed】
   }
 
-  // Info for creating new bonds
+  // 新创建的债券的发行周期信息【Info for creating new bonds】
   struct Terms {
-    uint256 controlVariable; // scaling variable for price
+    uint256 controlVariable; // 价格缩放变量【scaling variable for price（BCV）】
     bool fixedTerm; // fixed term or fixed expiration
-    uint256 vestingTerm; // term in blocks (fixed-term)
+    uint256 vestingTerm; // 授予期限（）【term in blocks (fixed-term)】
     uint256 expiration; // block number bond matures (fixed-expiration)
-    uint256 conclusion; // block number bond no longer offered
-    uint256 minimumPrice; // vs principal value
-    uint256 maxPayout; // in thousandths of a %. i.e. 500 = 0.5%
-    uint256 maxDebt; // 9 decimal debt ratio, max % total supply created as debt
+    uint256 conclusion; // 债券出售截止区块（到这个区块就不能deposit了）【block number bond no longer offered】
+    uint256 minimumPrice; // 债券最低价格【vs principal value】
+    uint256 maxPayout; // 用户购买债券时，合约单笔最大支付的OHM份额【in thousandths of a %. i.e. 500 = 0.5%】
+    uint256 maxDebt; // 本次债券周期允许出售债券最大额【9 decimal debt ratio, max % total supply created as debt】
   }
 
   /* ======== STATE VARIABLES ======== */
@@ -117,9 +117,9 @@ contract OlympusBondDepository is OlympusAccessControlled {
 
   /**
    * @notice set minimum price for new bond
-   * @param _id uint
-   * @param _controlVariable uint
-   * @param _fixedTerm bool
+   * @param _id uint                 //债券Id
+   * @param _controlVariable uint    // 价格缩放变量
+   * @param _fixedTerm bool          //
    * @param _vestingTerm uint
    * @param _expiration uint
    * @param _conclusion uint
@@ -159,7 +159,7 @@ contract OlympusBondDepository is OlympusAccessControlled {
   }
 
   /**
-   * @notice disable existing bond
+   * @notice 禁用现有债券【disable existing bond】
    * @param _id uint
    */
   function deprecateBond(uint256 _id) external onlyGuardian {
@@ -167,7 +167,7 @@ contract OlympusBondDepository is OlympusAccessControlled {
   }
 
   /**
-   * @notice set teller contract
+   * @notice 设置teller合约地址【set teller contract】
    * @param _teller address
    */
   function setTeller(address _teller) external onlyGovernor {
@@ -179,9 +179,9 @@ contract OlympusBondDepository is OlympusAccessControlled {
   /* ======== MUTABLE FUNCTIONS ======== */
 
   /**
-   * @notice deposit bond
-   * @param _amount uint
-   * @param _maxPrice uint
+   * @notice 购买债券【deposit bond】
+   * @param _amount uint         //用户支付的费用份额
+   * @param _maxPrice uint       //用户自己接受的最大价格
    * @param _depositor address
    * @param _BID uint
    * @param _feo address
@@ -207,11 +207,12 @@ contract OlympusBondDepository is OlympusAccessControlled {
 
     require(info.totalDebt <= info.terms.maxDebt, "Max debt exceeded");
     require(_maxPrice >= _bondPrice(_BID), "Slippage limit: more than max price"); // slippage protection
-
+    //计算这次购买的amount价值多少OHM
     uint256 value = treasury.tokenValue(address(info.principal), _amount);
+    //
     uint256 payout = payoutFor(value, _BID); // payout to bonder is computed
 
-    // ensure there is remaining capacity for bond
+    // 确保债券有剩余容量【ensure there is remaining capacity for bond】
     if (info.capacityIsPayout) {
       // capacity in payout terms
       require(info.capacity >= payout, "Bond concluded");
@@ -222,8 +223,8 @@ contract OlympusBondDepository is OlympusAccessControlled {
       info.capacity = info.capacity.sub(_amount);
     }
 
-    require(payout >= 10000000, "Bond too small"); // must be > 0.01 OHM ( underflow protection )
-    require(payout <= maxPayout(_BID), "Bond too large"); // size protection because there is no slippage
+    require(payout >= 10000000, "Bond too small"); //必须大于（10000000/10**9=0.01） OHM【 must be > 0.01 OHM ( underflow protection )】
+    require(payout <= maxPayout(_BID), "Bond too large"); // 必须小于债券允许消费的最大值【size protection because there is no slippage】
 
     info.principal.safeTransfer(address(treasury), _amount); // send payout to treasury
 
@@ -245,7 +246,7 @@ contract OlympusBondDepository is OlympusAccessControlled {
   /* ======== INTERNAL FUNCTIONS ======== */
 
   /**
-   * @notice reduce total debt
+   * @notice 可售债券衰减【reduce total debt】
    * @param _BID uint
    */
   function decayDebt(uint256 _BID) internal {
@@ -344,7 +345,7 @@ contract OlympusBondDepository is OlympusAccessControlled {
   // BOND PRICE
 
   /**
-   * @notice calculate current bond premium
+   * @notice 根据id获取债券的价格【calculate current bond premium】
    * @param _BID uint
    * @return price_ uint
    */
@@ -356,7 +357,7 @@ contract OlympusBondDepository is OlympusAccessControlled {
   }
 
   /**
-   * @notice calculate current bond price and remove floor if above
+   * @notice 计算当前债券价格，如高于底部则移除底部 【calculate current bond price and remove floor if above】
    * @param _BID uint
    * @return price_ uint
    */
@@ -371,7 +372,7 @@ contract OlympusBondDepository is OlympusAccessControlled {
   }
 
   /**
-   * @notice converts bond price to DAI value
+   * @notice 获取债券相对于DAI的价格【converts bond price to DAI value】
    * @param _BID uint
    * @return price_ uint
    */
@@ -387,9 +388,9 @@ contract OlympusBondDepository is OlympusAccessControlled {
   // DEBT
 
   /**
-   * @notice calculate current ratio of debt to OHM supply
-   * @param _BID uint
-   * @return debtRatio_ uint
+   * @notice 计算当前债券与OHM供应的比率【calculate current ratio of debt to OHM supply】
+   * @param _BID uint           债券id
+   * @return debtRatio_ uint    返回
    */
   function debtRatio(uint256 _BID) public view returns (uint256 debtRatio_) {
     debtRatio_ = FixedPoint.fraction(currentDebt(_BID).mul(1e9), treasury.baseSupply()).decode112with18().div(1e18); 
@@ -414,6 +415,7 @@ contract OlympusBondDepository is OlympusAccessControlled {
    * @return uint
    */
   function currentDebt(uint256 _BID) public view returns (uint256) {
+    //可售债券=总债券-已衰减的债券
     return bonds[_BID].totalDebt.sub(debtDecay(_BID));
   }
 
@@ -424,7 +426,7 @@ contract OlympusBondDepository is OlympusAccessControlled {
    */
   function debtDecay(uint256 _BID) public view returns (uint256 decay_) {
     Bond memory bond = bonds[_BID];
-    uint256 blocksSinceLast = block.number.sub(bond.lastDecay);
+    uint256 blocksSinceLast = block.number.sub(bond.lastDecay);//与上次衰减时的区块间隔
     decay_ = bond.totalDebt.mul(blocksSinceLast).div(bond.terms.vestingTerm);
     if (decay_ > bond.totalDebt) {
       decay_ = bond.totalDebt;
