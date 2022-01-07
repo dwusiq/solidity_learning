@@ -182,8 +182,8 @@ contract OlympusBondDepository is OlympusAccessControlled {
    * @notice 购买债券【deposit bond】
    * @param _amount uint         //用户支付的费用份额
    * @param _maxPrice uint       //用户自己接受的最大价格
-   * @param _depositor address
-   * @param _BID uint
+   * @param _depositor address   //债券收益接收者
+   * @param _BID uint            //债券编号
    * @param _feo address         //这个地址由前端传入（接受部分奖励分配）
    * @return uint
    */
@@ -287,7 +287,7 @@ contract OlympusBondDepository is OlympusAccessControlled {
   }
 
   /**
-   * @notice returns terms for a bond type
+   * @notice 根据债券的索引获取其配置的周期信息【returns terms for a bond type】
    * @param _BID uint
    * @return controlVariable_ uint
    * @return vestingTerm_ uint
@@ -317,7 +317,7 @@ contract OlympusBondDepository is OlympusAccessControlled {
   // PAYOUT
 
   /**
-   * @notice determine maximum bond size
+   * @notice 控制单笔购买债券的最大消费金额（合约购买债券单笔允许支出最大金额）【determine maximum bond size】
    * @param _BID uint
    * @return uint
    */
@@ -336,19 +336,20 @@ contract OlympusBondDepository is OlympusAccessControlled {
   }
 
   /**
-   * @notice payout due for amount of token
+   * @notice 指定购买金额和债券索引，判断能领取多少报酬(OHM)【payout due for amount of token】
    * @param _amount uint
    * @param _BID uint
    */
   function payoutForAmount(uint256 _amount, uint256 _BID) public view returns (uint256) {
     address principal = address(bonds[_BID].principal);
+    //计算出购买的债券价值多少OHM,再判断买入的这些份额，协议会给他多少回报
     return payoutFor(treasury.tokenValue(principal, _amount), _BID);
   }
 
   // BOND PRICE
 
   /**
-   * @notice 根据id获取债券的价格【calculate current bond premium】
+   * @notice 根据id获取债券的价格()【calculate current bond premium】
    * @param _BID uint
    * @return price_ uint
    */
@@ -396,6 +397,7 @@ contract OlympusBondDepository is OlympusAccessControlled {
    * @return debtRatio_ uint    返回
    */
   function debtRatio(uint256 _BID) public view returns (uint256 debtRatio_) {
+    //比例=当前未兑现的债券报酬/OHM总供应量
     debtRatio_ = FixedPoint.fraction(currentDebt(_BID).mul(1e9), treasury.baseSupply()).decode112with18().div(1e18); 
   }
 

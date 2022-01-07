@@ -82,9 +82,9 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
 
     mapping(address => uint256) public debtLimit;
 
-    uint256 public totalReserves;
-    uint256 public totalDebt;
-    uint256 public ohmDebt;
+    uint256 public totalReserves;//合约当前储备金总额（折算OHM）
+    uint256 public totalDebt; //合约往外借的所有资产总额（折算OHM）
+    uint256 public ohmDebt;//合约往外借的OHM总额
 
     Queue[] public permissionQueue; //许可队列
     uint256 public immutable blocksNeededForQueue; //每个许可队列要等待的区块数
@@ -533,6 +533,7 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
      * @return uint256
      */
     function baseSupply() external view override returns (uint256) {
+        //OHM总供应量=omm总流动性-合约已往外借出去的份额（因为往外借的份额都是借的时候直接mint出来的，还的时候需要销毁，所以不算上总供应量）
         return OHM.totalSupply() - ohmDebt;
     }
 }

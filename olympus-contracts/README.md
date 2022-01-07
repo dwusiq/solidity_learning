@@ -1,19 +1,22 @@
 # 工程描述
 
 
-## 合约
-|合约|描述|目录|继承|
-|-|-|-|-|
-|`OlympusERC20Token`|`OHM`主币|`/`|`ERC20Permit, IOHM, OlympusAccessControlled` |
-|`ERC20Permit`|用户线下签名`approve`函数，其它用户可以线上验证这个签名串，然后自行调用`approve`获得`owner`的`allowance`份额|`/types/ERC20Permit.sol`|`ERC20, IERC20Permit, EIP712` |
-|`OlympusAccessControlled`|各权限控制的`modifier`|`/types/OlympusAccessControlled.sol`||
-|`OlympusAuthority`|权限管理,允许变更相关地址|`/`|`IOlympusAuthority, OlympusAccessControlled `|
-|`OlympusStaking`|每个纪元（一个时间段）触发一次价格调整（Rebase的代币都有一个目标价格，当价格高于目标价时，就会自动增发；反之会进行通缩）|`/`|`OlympusAccessControlled `|
-|``||||
-|``||||
-|``||||
-|``||||
-|``||||
+## 主要合约
+|合约|描述|其它|
+|-|-|-|
+|`OlympusERC20`|`OHM`主币||
+|`sOlympusERC20`|辅助币，质押(`staking`)`OHM`或购买债券(`bond`)获取||
+|`gOHM`|治理代币,质押(`staking`)`OHM`获取|待了解|
+|`Staking`|每个纪元（一个时间段）触发一次价格调整（Rebase的代币都有一个目标价格，当价格高于目标价时，就会自动增发；反之会进行通缩）|rebase细节待了解|
+|`ERC20Permit`|用户线下签名`approve`函数，其它用户可以线上验证这个签名串，然后自行调用`approve`获得`owner`的`allowance`份额||
+|`OlympusAccessControlled`|各权限控制的`modifier`||
+|`OlympusAuthority`|权限管理,允许变更相关地址||
+
+|``|||
+|``|||
+|``|||
+|``|||
+|``|||
 
 ## 部署合约
 ###  依赖合约地址准备

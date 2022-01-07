@@ -105,7 +105,7 @@ contract OlympusStaking is OlympusAccessControlled {
             return _send(_to, _amount, _rebasing);
         } else {
             //需要热身等待，添加到热身等待
-            Claim memory info = warmupInfo[_to];
+            // Claim memory info = warmupInfo[_to];
             if (!info.lock) {
                 require(
                     _to == msg.sender,
@@ -242,25 +242,27 @@ contract OlympusStaking is OlympusAccessControlled {
     }
 
     /**
-     * @notice 如果epoch结束，触发rebase【trigger rebase if epoch over】
+     * @notice 判断当前epoch是否已结束，如果epoch已结束，触发rebase【trigger rebase if epoch over】
      * @return uint256
      */
     function rebase() public returns (uint256) {
         uint256 bounty;
-        //要求当前期未结束
+        //当前期的epoch已结束才触发变基
         if (epoch.end <= block.timestamp) {
             sOHM.rebase(epoch.distribute, epoch.number);
 
+           //开启下一个纪元
             epoch.end = epoch.end.add(epoch.length);
             epoch.number++;
 
             //如果配置了distributor合约地址，则mint分红奖
             if (address(distributor) != address(0)) {
                 distributor.distribute();//给事先配置的分红地址mint发OHm
-                bounty = distributor.retrieveBounty(); //最终通过Treasury调用OHM给当前staking合约mint分红奖【Will mint ohm for this contract if there exists a bounty】
+                //最终通过Treasury调用OHM给当前staking合约mint分红奖【Will mint ohm for this contract if there exists a bounty】
+                bounty = distributor.retrieveBounty(); 
             }
             uint256 balance = OHM.balanceOf(address(this));
-            uint256 staked = sOHM.circulatingSupply();//获取
+            uint256 staked = sOHM.circulatingSupply();//获取sOHM除了在staking合约之外的总份额
             if (balance <= staked.add(bounty)) {
                 epoch.distribute = 0;
             } else {

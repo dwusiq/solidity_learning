@@ -52,7 +52,7 @@ contract sOlympus is IsOHM, ERC20Permit {
     address public stakingContract; // balance used to calc rebase
     IgOHM public gOHM; // additional staked supply (governance token)
 
-    Rebase[] public rebases; // past rebase data
+    Rebase[] public rebases; // 历史变基记录【past rebase data】
 
     uint256 private constant MAX_UINT256 = type(uint256).max;
     uint256 private constant INITIAL_FRAGMENTS_SUPPLY = 5_000_000 * 10**9;
@@ -123,8 +123,10 @@ contract sOlympus is IsOHM, ERC20Permit {
      //参考：https://docs.olympusdao.finance/main/basics/basics#what-is-a-rebase
     function rebase(uint256 profit_, uint256 epoch_) public override onlyStakingContract returns (uint256) {
         uint256 rebaseAmount;
+        //获取流通中的sOHM（sOHM除了在staking合约之外的总份额）
         uint256 circulatingSupply_ = circulatingSupply();
         if (profit_ == 0) {
+            //返回sOHM当前供应总额
             emit LogSupply(epoch_, _totalSupply);
             emit LogRebase(epoch_, 0, index());
             return _totalSupply;
