@@ -35,6 +35,19 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
 
     /* ========== DATA STRUCTURES ========== */
 
+    // RESERVEDEPOSITOR:允许存入储备金
+    // RESERVESPENDER:允许提现储备金
+    // RESERVETOKEN:允许成为合约支持的储备金
+    // RESERVEMANAGER:允许管理储备金（有这个权限可以提取当前合约的储备金）
+    // LIQUIDITYDEPOSITOR:允许存入LpToken
+    // LIQUIDITYTOKEN:允许允许成为合约支持的lpToken
+    // LIQUIDITYMANAGER:允许管理lpToken（有这个权限可以提取当前合约的lpToken）
+    // RESERVEDEBTOR:允许借用储备金
+    // REWARDMANAGER:允许铸造OHM给其它用户
+    // SOHM:
+    // OHMDEBTOR:允许借用OHM
+    
+
     enum STATUS {
         RESERVEDEPOSITOR,
         RESERVESPENDER,
@@ -46,7 +59,7 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
         RESERVEDEBTOR,
         REWARDMANAGER,
         SOHM,
-        OHMDEBTOR
+        OHMDEBTOR   
     }
 
     struct Queue {
@@ -104,7 +117,7 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
     /* ========== MUTATIVE FUNCTIONS ========== */
 
     /**
-     * @notice 被授权的地址可以存入Token获取OHM【allow approved address to deposit an asset for OHM】
+     * @notice 被授权的地址可以存入Token获取OHM(当前只有升级合约用到该接口)【allow approved address to deposit an asset for OHM】
      * @param _amount uint256   //存入的金额
      * @param _token address    //存入的Token地址
      * @param _profit uint256   //
@@ -162,7 +175,7 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
     }
 
     /**
-     * @notice 被授权的地址允许提取token（不会销毁OHM）【allow approved address to withdraw assets】
+     * @notice 被授权的地址允许提取token（不会销毁OHM）（目前只有升级合约调用）【allow approved address to withdraw assets】
      * @param _token address
      * @param _amount uint256
      */
@@ -185,7 +198,7 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
     }
 
     /**
-     * @notice mint new OHM using excess reserves
+     * @notice 铸造OHM给指定用户【mint new OHM using excess reserves】
      * @param _recipient address
      * @param _amount uint256
      */
@@ -208,12 +221,14 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
      */
 
     /**
-     * @notice allow approved address to borrow reserves
+     * @notice 被批准的地址可以借用储备金【allow approved address to borrow reserves】
      * @param _amount uint256
      * @param _token address
      */
     function incurDebt(uint256 _amount, address _token) external override {
         uint256 value;
+
+        //判断用户是否允许借贷、判断token是否允许作为储备金
         if (_token == address(OHM)) {
             require(permissions[STATUS.OHMDEBTOR][msg.sender], notApproved);
             value = _amount;
@@ -224,14 +239,20 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
         }
         require(value != 0, invalidToken);
 
+        //不管借什么token,都登记为sOHM
         sOHM.changeDebt(value, msg.sender, true);
+        //不许超过个人的最大允许借贷额度
         require(sOHM.debtBalances(msg.sender) <= debtLimit[msg.sender], "Treasury: exceeds limit");
+        //累加合约总共往外借了多少份额
         totalDebt = totalDebt.add(value);
 
         if (_token == address(OHM)) {
+            //如果是OHM,直接mint
             OHM.mint(msg.sender, value);
+            //合约往外借的OHM总额增加
             ohmDebt = ohmDebt.add(value);
         } else {
+            //如果是其它token，减少储备金就直接转给用户
             totalReserves = totalReserves.sub(value);
             IERC20(_token).safeTransfer(msg.sender, _amount);
         }
@@ -239,30 +260,42 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
     }
 
     /**
-     * @notice allow approved address to repay borrowed reserves with reserves
+     * @notice 允许授权用户偿还之前的借款（不是OHM,而是其它token）【allow approved address to repay borrowed reserves with reserves】
      * @param _amount uint256
      * @param _token address
      */
     function repayDebtWithReserve(uint256 _amount, address _token) external override {
+        //判断用户是否允许借款
         require(permissions[STATUS.RESERVEDEBTOR][msg.sender], notApproved);
+        //判断用户是否被支持作为储备金
         require(permissions[STATUS.RESERVETOKEN][_token], notAccepted);
+        //从用户的账户中将token转到当前合约
         IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
+        //将用户还款token的份额折算回OHM的份额
         uint256 value = tokenValue(_token, _amount);
+        //减少用户的当前欠款值
         sOHM.changeDebt(value, msg.sender, false);
+        //协议往外借款总额减少
         totalDebt = totalDebt.sub(value);
+        //合约储备金总额增加
         totalReserves = totalReserves.add(value);
         emit RepayDebt(msg.sender, _token, _amount, value);
     }
 
     /**
-     * @notice allow approved address to repay borrowed reserves with OHM
+     * @notice 允许授权用户偿还之前的OHM借款【allow approved address to repay borrowed reserves with OHM】
      * @param _amount uint256
      */
     function repayDebtWithOHM(uint256 _amount) external {
+        //判断用户可以借储备金或者用户可以借OHM
         require(permissions[STATUS.RESERVEDEBTOR][msg.sender] || permissions[STATUS.OHMDEBTOR][msg.sender], notApproved);
+       //直接销毁用户帐下的OHM
         OHM.burnFrom(msg.sender, _amount);
+        //减少用户当前的欠款额
         sOHM.changeDebt(_amount, msg.sender, false);
+        //协议往外借款总额减少
         totalDebt = totalDebt.sub(_amount);
+        //合约往外借的OHM总额减少
         ohmDebt = ohmDebt.sub(_amount);
         emit RepayDebt(msg.sender, address(OHM), _amount, _amount);
     }
@@ -270,8 +303,9 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
     /* ========== MANAGERIAL FUNCTIONS ========== */
 
     /**
-     * @notice takes inventory of all tracked assets
-     * @notice always consolidate to recognized reserves before audit
+     * 重新盘点当前合约支持的所有token的总价值（总共价值多少OHM）
+     * @notice 对所有跟踪的资产进行盘存【takes inventory of all tracked assets】
+     * @notice 在审计前，总是合并到已确认的储备 【always consolidate to recognized reserves before audit】
      */
     function auditReserves() external onlyGovernor {
         uint256 reserves;
@@ -313,8 +347,10 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
     ) external onlyGovernor {
         require(timelockEnabled == false, "Use queueTimelock");
         if (_status == STATUS.SOHM) {
+            //允许指定的_address作为sOHM合约地址
             sOHM = IsOHM(_address);
         } else {
+            //其它授权
             permissions[_status][_address] = true;
 
             if (_status == STATUS.LIQUIDITYTOKEN) {

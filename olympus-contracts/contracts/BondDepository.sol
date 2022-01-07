@@ -33,18 +33,18 @@ contract OlympusBondDepository is OlympusAccessControlled {
     IBondingCalculator calculator; // 债券计算合约【contract to value principal】
     Terms terms; // 债券周期信息【terms of bond】
     bool termsSet; // 是否已设置债券周期【have terms been set】
-    uint256 capacity; // capacity remaining
-    bool capacityIsPayout; // capacity limit is for payout vs principal
+    uint256 capacity; // 剩余的用量【capacity remaining】
+    bool capacityIsPayout; // 指明限制的是什么类型的容量（true:本债券剩余最大支出。 false: 本债券剩余最大买进金额）capacity limit is for payout vs principal
     uint256 totalDebt; // 已销售债券总额【total debt from bond】
-    uint256 lastDecay; // 上次可售债券衰减时的区块【last block when debt was decayed】
+    uint256 lastDecay; // 上次待兑现债券衰减时的区块【last block when debt was decayed】
   }
 
   // 新创建的债券的发行周期信息【Info for creating new bonds】
   struct Terms {
     uint256 controlVariable; // 价格缩放变量【scaling variable for price（BCV）】
-    bool fixedTerm; // fixed term or fixed expiration
-    uint256 vestingTerm; // 授予期限（）【term in blocks (fixed-term)】
-    uint256 expiration; // block number bond matures (fixed-expiration)
+    bool fixedTerm; // 是否限定用户购买债券的锁定期限（true:则用户购买债券后等待vestingTerm个块可取回本金。 false:用户质押后要等到expiration指定的区块才能取回）  fixed term or fixed expiration
+    uint256 vestingTerm; // 用户购买债券需要锁定的期限（OlympusDao在以太坊主网是33110个块，约5天）【term in blocks (fixed-term)】
+    uint256 expiration; // 用户购买债券后要等区块升到这个值时才可取回本金【block number bond matures (fixed-expiration)】
     uint256 conclusion; // 债券出售截止区块（到这个区块就不能deposit了）【block number bond no longer offered】
     uint256 minimumPrice; // 债券最低价格【vs principal value】
     uint256 maxPayout; // 用户购买债券时，合约单笔最大支付的OHM份额【in thousandths of a %. i.e. 500 = 0.5%】
@@ -77,10 +77,10 @@ contract OlympusBondDepository is OlympusAccessControlled {
   /* ======== POLICY FUNCTIONS ======== */
 
   /**
-   * @notice creates a new bond type
-   * @param _principal address
-   * @param _calculator address
-   * @param _capacity uint
+   * @notice 新增一个平台支持的债券类型【creates a new bond type】
+   * @param _principal address     质押的资产地址
+   * @param _calculator address    StandardBondingCalculator合约地址
+   * @param _capacity uint         
    * @param _capacityIsPayout bool
    */
   function addBond(
@@ -184,7 +184,7 @@ contract OlympusBondDepository is OlympusAccessControlled {
    * @param _maxPrice uint       //用户自己接受的最大价格
    * @param _depositor address
    * @param _BID uint
-   * @param _feo address
+   * @param _feo address         //这个地址由前端传入（接受部分奖励分配）
    * @return uint
    */
   function deposit(
@@ -203,22 +203,23 @@ contract OlympusBondDepository is OlympusAccessControlled {
 
     emit beforeBond(_BID, bondPriceInUSD(_BID), bondPrice(_BID), debtRatio(_BID));
 
+    //债务衰减
     decayDebt(_BID);
 
     require(info.totalDebt <= info.terms.maxDebt, "Max debt exceeded");
     require(_maxPrice >= _bondPrice(_BID), "Slippage limit: more than max price"); // slippage protection
     //计算这次购买的amount价值多少OHM
     uint256 value = treasury.tokenValue(address(info.principal), _amount);
-    //
+    //判断买入的这些份额，协议会给他多少回报
     uint256 payout = payoutFor(value, _BID); // payout to bonder is computed
 
     // 确保债券有剩余容量【ensure there is remaining capacity for bond】
     if (info.capacityIsPayout) {
-      // capacity in payout terms
+      // 校验该债券允许支出多少OHM【capacity in payout terms】
       require(info.capacity >= payout, "Bond concluded");
       info.capacity = info.capacity.sub(payout);
     } else {
-      // capacity in principal terms
+      // 校验该债券允许买进多少资newBond产【capacity in principal terms】
       require(info.capacity >= _amount, "Bond concluded");
       info.capacity = info.capacity.sub(_amount);
     }
@@ -226,10 +227,12 @@ contract OlympusBondDepository is OlympusAccessControlled {
     require(payout >= 10000000, "Bond too small"); //必须大于（10000000/10**9=0.01） OHM【 must be > 0.01 OHM ( underflow protection )】
     require(payout <= maxPayout(_BID), "Bond too large"); // 必须小于债券允许消费的最大值【size protection because there is no slippage】
 
+    //把用户买进的资产（LP）转给财政部合约
     info.principal.safeTransfer(address(treasury), _amount); // send payout to treasury
-
+    //已售债务累加
     bonds[_BID].totalDebt = info.totalDebt.add(value); // increase total debt
-
+    
+    //计算可取回本金时间
     uint256 expiration = info.terms.vestingTerm.add(block.number);
     if (!info.terms.fixedTerm) {
       expiration = info.terms.expiration;
@@ -246,7 +249,7 @@ contract OlympusBondDepository is OlympusAccessControlled {
   /* ======== INTERNAL FUNCTIONS ======== */
 
   /**
-   * @notice 可售债券衰减【reduce total debt】
+   * @notice 待兑现债券份额衰减【reduce total debt】
    * @param _BID uint
    */
   function decayDebt(uint256 _BID) internal {
@@ -259,12 +262,12 @@ contract OlympusBondDepository is OlympusAccessControlled {
   // BOND TYPE INFO
 
   /**
-   * @notice returns data about a bond type
-   * @param _BID uint
-   * @return principal_ address
-   * @return calculator_ address
-   * @return totalDebt_ uint
-   * @return lastBondCreatedAt_ uint
+   * @notice 根据索引id查询某个债券的信息【returns data about a bond type】
+   * @param _BID uint                   债券索引
+   * @return principal_ address         支持质押的资产地址
+   * @return calculator_ address        StandardBondingCalculator合约地址（债券计算合约）
+   * @return totalDebt_ uint            当前的债务总额
+   * @return lastBondCreatedAt_ uint    
    */
   function bondInfo(uint256 _BID)
     external
@@ -388,7 +391,7 @@ contract OlympusBondDepository is OlympusAccessControlled {
   // DEBT
 
   /**
-   * @notice 计算当前债券与OHM供应的比率【calculate current ratio of debt to OHM supply】
+   * @notice 计算当前待兑现债券（已减去衰减但未领取部分）与OHM供应的比率【calculate current ratio of debt to OHM supply】
    * @param _BID uint           债券id
    * @return debtRatio_ uint    返回
    */
@@ -410,24 +413,26 @@ contract OlympusBondDepository is OlympusAccessControlled {
   }
 
   /**
-   * @notice calculate debt factoring in decay
+   * @notice 计算当前带兑现债务（不包括已衰减的）【calculate debt factoring in decay】
    * @param _BID uint
    * @return uint
    */
   function currentDebt(uint256 _BID) public view returns (uint256) {
-    //可售债券=总债券-已衰减的债券
+    //待兑现债券总额（已减去衰减但未领取部分）=当前待兑现债券总额-已减去衰减但未领取份额
     return bonds[_BID].totalDebt.sub(debtDecay(_BID));
   }
 
   /**
-   * @notice amount to decay total debt by
+   * @notice 根据债券Id,计算当前时间段已衰减的债务总额【amount to decay total debt by】
    * @param _BID uint
    * @return decay_ uint
    */
   function debtDecay(uint256 _BID) public view returns (uint256 decay_) {
     Bond memory bond = bonds[_BID];
     uint256 blocksSinceLast = block.number.sub(bond.lastDecay);//与上次衰减时的区块间隔
+    //当前时间段衰减的债务=待兑现债务总额*区块间隔/债务授权区块个数
     decay_ = bond.totalDebt.mul(blocksSinceLast).div(bond.terms.vestingTerm);
+    //衰减的债务不得大于待兑现债务总额
     if (decay_ > bond.totalDebt) {
       decay_ = bond.totalDebt;
     }

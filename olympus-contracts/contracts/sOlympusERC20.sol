@@ -225,13 +225,13 @@ contract sOlympus is IsOHM, ERC20Permit {
         return true;
     }
 
-    // this function is called by the treasury, and informs sOHM of changes to debt.
+    // 变更借款者当前欠款份额 this function is called by the treasury, and informs sOHM of changes to debt.
     // note that addresses with debt balances cannot transfer collateralized sOHM
     // until the debt has been repaid.
     function changeDebt(
-        uint256 amount,
-        address debtor,
-        bool add
+        uint256 amount,  //变化的额度
+        address debtor,  //欠款者
+        bool add         //是否接增加已欠款额度  true: 已欠款额度增加  false:已欠款额度减少
     ) external override {
         require(msg.sender == treasury, "Only treasury");
         if (add) {
