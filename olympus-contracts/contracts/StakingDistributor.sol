@@ -10,7 +10,7 @@ import "./interfaces/IDistributor.sol";
 
 import "./types/OlympusAccessControlled.sol";
 
-//Distributor：经销商
+//Distributor：分配者（1、可以配置收益者的收益占总OHM供应的比例，2、给staking合约铸币用户质押分红）
 contract Distributor is IDistributor, OlympusAccessControlled {
     /* ========== DEPENDENCIES ========== */
 
@@ -77,7 +77,7 @@ contract Distributor is IDistributor, OlympusAccessControlled {
     }
 
 
-    //  @notice 给staking合约铸币，用于分红
+    //  @notice 给staking合约铸币，用于给质押者的分红分红
     function retrieveBounty() external override returns (uint256) {
         require(msg.sender == staking, "Only staking");
         // If the distributor bounty is > 0, mint it for the staking contract.
@@ -151,7 +151,7 @@ contract Distributor is IDistributor, OlympusAccessControlled {
     /* ====== POLICY FUNCTIONS ====== */
 
     /**
-     * @notice set bounty to incentivize keepers
+     * @notice 设置每次给`OHM`的质押者分配的总分红【set bounty to incentivize keepers】
      * @param _bounty uint256
      */
     function setBounty(uint256 _bounty) external override onlyGovernor {

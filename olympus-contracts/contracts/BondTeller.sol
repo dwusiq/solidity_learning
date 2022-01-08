@@ -13,6 +13,7 @@ import "./interfaces/ITeller.sol";
 
 import "./types/OlympusAccessControlled.sol";
 
+//债券出纳员
 contract BondTeller is ITeller, OlympusAccessControlled {
     /* ========== DEPENDENCIES ========== */
 
@@ -138,7 +139,7 @@ contract BondTeller is ITeller, OlympusAccessControlled {
     }
 
     /**
-     *  @notice 提取债券报酬给用户（sOHM）【redeem bond for user】
+     *  @notice 根据用户地址和索引支付债券报酬给用户（sOHM）【redeem bond for user】
      *  @param _bonder address
      *  @param _indexes calldata uint256[]
      *  @return uint256

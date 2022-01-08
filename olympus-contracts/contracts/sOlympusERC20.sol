@@ -44,7 +44,7 @@ contract sOlympus is IsOHM, ERC20Permit {
     }
 
     /* ========== STATE VARIABLES ========== */
-
+   //初始化用户
     address internal initializer;
 
     uint256 internal INDEX; // Index Gons - tracks rebase growth
@@ -59,24 +59,30 @@ contract sOlympus is IsOHM, ERC20Permit {
 
     // TOTAL_GONS is a multiple of INITIAL_FRAGMENTS_SUPPLY so that _gonsPerFragment is an integer.
     // Use the highest value that fits in a uint256 for max granularity.
-    uint256 private constant TOTAL_GONS = MAX_UINT256 - (MAX_UINT256 % INITIAL_FRAGMENTS_SUPPLY);
+    //gons总份额
+    uint256 private constant TOTAL_GONS = MAX_UINT256 - (MAX_UINT256 % INITIAL_FRAGMENTS_SUPPLY); 
 
     // MAX_SUPPLY = maximum integer < (sqrt(4*TOTAL_GONS + 1) - 1) / 2
+    //sOHM最大供应量
     uint256 private constant MAX_SUPPLY = ~uint128(0); // (2^128) - 1
-
+    //每份sOHM价值多少gons
     uint256 private _gonsPerFragment;
+    //用户的gons份额
     mapping(address => uint256) private _gonBalances;
-
+    //用户授权额度
     mapping(address => mapping(address => uint256)) private _allowedValue;
 
     address public treasury;
+    //用户当前欠款额度
     mapping(address => uint256) public override debtBalances;
 
     /* ========== CONSTRUCTOR ========== */
 
     constructor() ERC20("Staked OHM", "sOHM", 9) ERC20Permit("Staked OHM") {
         initializer = msg.sender;
+        //sOHM的总供应量  TODO  没有找到定义的地方？
         _totalSupply = INITIAL_FRAGMENTS_SUPPLY;
+        //计算每单位sOHM价值多少gons
         _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
     }
 
@@ -123,21 +129,21 @@ contract sOlympus is IsOHM, ERC20Permit {
      //参考：https://docs.olympusdao.finance/main/basics/basics#what-is-a-rebase
     function rebase(uint256 profit_, uint256 epoch_) public override onlyStakingContract returns (uint256) {
         uint256 rebaseAmount;
-        //获取流通中的sOHM（sOHM除了在staking合约之外的总份额）
-        uint256 circulatingSupply_ = circulatingSupply();
+        //获取流通中的sOHM（流动资金=总sOHM供应量-staking合约的sOHM总份额()+gOHM总流动性折算OHM的总价值+质押合约中处于质押热身阶段的OHM）
+        uint256 circulatingSupply_ = circulatingSupply();//
         if (profit_ == 0) {
             //返回sOHM当前供应总额
             emit LogSupply(epoch_, _totalSupply);
             emit LogRebase(epoch_, 0, index());
             return _totalSupply;
         } else if (circulatingSupply_ > 0) {
-            rebaseAmount = profit_.mul(_totalSupply).div(circulatingSupply_);
+            rebaseAmount = profit_.mul(_totalSupply).div(circulatingSupply_); //TODO 不知道这个算法的目的
         } else {
             rebaseAmount = profit_;
         }
 
         _totalSupply = _totalSupply.add(rebaseAmount);
-
+        //不得超过sOHM最大供应量
         if (_totalSupply > MAX_SUPPLY) {
             _totalSupply = MAX_SUPPLY;
         }
@@ -163,13 +169,13 @@ contract sOlympus is IsOHM, ERC20Permit {
         uint256 rebasePercent = profit_.mul(1e18).div(previousCirculating_);
         rebases.push(
             Rebase({
-                epoch: epoch_,
-                rebase: rebasePercent, // 18 decimals
-                totalStakedBefore: previousCirculating_,
-                totalStakedAfter: circulatingSupply(),
-                amountRebased: profit_,
-                index: index(),
-                blockNumberOccured: block.number
+                epoch: epoch_,                             //当前阶段的起始区块
+                rebase: rebasePercent, // 18 decimals      //
+                totalStakedBefore: previousCirculating_,   //变基前总流通中的sOHM
+                totalStakedAfter: circulatingSupply(),      //变基后总流通中的sOHM
+                amountRebased: profit_,                     //变基的份额
+                index: index(),                             //索引
+                blockNumberOccured: block.number            //当前区块（即结束区块）
             })
         );
 
@@ -261,20 +267,22 @@ contract sOlympus is IsOHM, ERC20Permit {
         return _gonBalances[who].div(_gonsPerFragment);
     }
 
+    //计算gons份额这算回sOHM份额
     function gonsForBalance(uint256 amount) public view override returns (uint256) {
         return amount.mul(_gonsPerFragment);
     }
 
+    // 计算sOHM的份额这算会gons的份额
     function balanceForGons(uint256 gons) public view override returns (uint256) {
         return gons.div(_gonsPerFragment);
     }
 
-    // toG converts an sOHM balance to gOHM terms. gOHM is an 18 decimal token. balance given is in 18 decimal format.
+    // 计算sOHM折算回gOHM【toG converts an sOHM balance to gOHM terms. gOHM is an 18 decimal token. balance given is in 18 decimal format.】
     function toG(uint256 amount) external view override returns (uint256) {
         return gOHM.balanceTo(amount);
     }
 
-    // fromG converts a gOHM balance to sOHM terms. sOHM is a 9 decimal token. balance given is in 9 decimal format.
+    // 计算gOHM的份额折算回sOHM有多少【fromG converts a gOHM balance to sOHM terms. sOHM is a 9 decimal token. balance given is in 9 decimal format.】
     function fromG(uint256 amount) external view override returns (uint256) {
         return gOHM.balanceFrom(amount);
     }

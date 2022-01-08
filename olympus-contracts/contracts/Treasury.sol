@@ -46,8 +46,6 @@ contract OlympusTreasury is OlympusAccessControlled, ITreasury {
     // REWARDMANAGER:允许铸造OHM给其它用户
     // SOHM:
     // OHMDEBTOR:允许借用OHM
-    
-
     enum STATUS {
         RESERVEDEPOSITOR,
         RESERVESPENDER,

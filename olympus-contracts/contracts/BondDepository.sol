@@ -116,7 +116,7 @@ contract OlympusBondDepository is OlympusAccessControlled {
   }
 
   /**
-   * @notice set minimum price for new bond
+   * @notice 设置债券的售卖期信息【set minimum price for new bond】
    * @param _id uint                 //债券Id
    * @param _controlVariable uint    // 价格缩放变量
    * @param _fixedTerm bool          //
@@ -227,7 +227,7 @@ contract OlympusBondDepository is OlympusAccessControlled {
     require(payout >= 10000000, "Bond too small"); //必须大于（10000000/10**9=0.01） OHM【 must be > 0.01 OHM ( underflow protection )】
     require(payout <= maxPayout(_BID), "Bond too large"); // 必须小于债券允许消费的最大值【size protection because there is no slippage】
 
-    //把用户买进的资产（LP）转给财政部合约
+    //把用户买进的资产（LP）转给财政部合约   TODO 这里不用转用户的资产进来？
     info.principal.safeTransfer(address(treasury), _amount); // send payout to treasury
     //已售债务累加
     bonds[_BID].totalDebt = info.totalDebt.add(value); // increase total debt
@@ -326,7 +326,7 @@ contract OlympusBondDepository is OlympusAccessControlled {
   }
 
   /**
-   * @notice payout due for amount of treasury value
+   * @notice 判断买入的这些份额，协议会给他多少回报【payout due for amount of treasury value】
    * @param _value uint
    * @param _BID uint
    * @return uint

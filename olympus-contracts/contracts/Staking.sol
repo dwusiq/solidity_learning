@@ -11,7 +11,7 @@ import "./interfaces/IDistributor.sol";
 
 import "./types/OlympusAccessControlled.sol";
 
-//每个纪元（一个时间段）触发一次价格调整（Rebase的代币都有一个目标价格，当价格高于目标价时，就会自动增发；反之会进行通缩）
+//质押合约，每个纪元（一个时间段）触发一次价格调整（Rebase的代币都有一个目标价格，当价格高于目标价时，就会自动增发；反之会进行通缩）
 contract OlympusStaking is OlympusAccessControlled {
     /* ========== DEPENDENCIES ========== */
 
@@ -84,7 +84,7 @@ contract OlympusStaking is OlympusAccessControlled {
     /* ========== MUTATIVE FUNCTIONS ========== */
 
     /**
-     * @notice 质押OHM进入热身状态【stake OHM to enter warmup】
+     * @notice 质押OHM【stake OHM to enter warmup】
      * @param _to address  //质押的份额归属地址（当前只能是sender）
      * @param _amount uint //质押OHM的份额
      * @param _claim bool  // 是否索赔
@@ -115,7 +115,7 @@ contract OlympusStaking is OlympusAccessControlled {
 
             warmupInfo[_to] = Claim({
                 deposit: info.deposit.add(_amount),//金额累加
-                gons: info.gons.add(sOHM.gonsForBalance(_amount)),
+                gons: info.gons.add(sOHM.gonsForBalance(_amount)), //到期后可提取的收益
                 expiry: epoch.number.add(warmupPeriod),
                 lock: info.lock
             });
@@ -127,7 +127,7 @@ contract OlympusStaking is OlympusAccessControlled {
     }
 
     /**
-     * @notice 从热身中赎回自己质押的所有份额（得到sOHM或gOHM）【retrieve stake from warmup】
+     * @notice 锁仓期到了之后，从热身中赎回自己质押的所有份额（得到sOHM或gOHM）【retrieve stake from warmup】
      * @param _to address
      * @param _rebasing bool
      * @return uint
@@ -169,7 +169,7 @@ contract OlympusStaking is OlympusAccessControlled {
     }
 
     /**
-     * @notice prevent new deposits or claims from ext. address (protection from malicious activity)
+     * @notice 切换锁的状态（影响提取收益的用户地址）  TODO 任何用户都可以调用？  prevent new deposits or claims from ext. address (protection from malicious activity)
      */
     function toggleLock() external {
         warmupInfo[msg.sender].lock = !warmupInfo[msg.sender].lock;
@@ -312,7 +312,7 @@ contract OlympusStaking is OlympusAccessControlled {
     }
 
     /**
-     * @notice 还有多少个区块到下一轮纪元（即本轮纪元还有多少个区块结束）【seconds until the next epoch begins】
+     * @notice 还有多久到下一轮纪元（即本轮纪元还有多久结束）【seconds until the next epoch begins】
      */
     function secondsToNextEpoch() external view returns (uint256) {
         return epoch.end.sub(block.timestamp);
@@ -321,7 +321,7 @@ contract OlympusStaking is OlympusAccessControlled {
     /* ========== MANAGERIAL FUNCTIONS ========== */
 
     /**
-     * @notice 设置质押LpToken的合约地址（改合约支持用户购买债券）。【sets the contract address for LP staking】
+     * @notice 变更`StakingDistributor`合约地址。【sets the contract address for LP staking】
      * @param _distributor address
      */
     function setDistributor(address _distributor) external onlyGovernor {
