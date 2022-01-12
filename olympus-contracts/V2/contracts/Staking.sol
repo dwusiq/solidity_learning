@@ -141,7 +141,7 @@ contract OlympusStaking is OlympusAccessControlled {
                 "External claims for accoun t are locked"
             );
         }
-
+        //要求用户质押时的那个阶段(epoch)已结束（即已开启第二个阶段）
         if (epoch.number >= info.expiry && info.expiry != 0) {
             delete warmupInfo[_to];
 
