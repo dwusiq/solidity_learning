@@ -25,8 +25,12 @@ const initialRewardRate = '3000';
 
 
 //for test
-// 初始mint多少token【Initial mint for DAI (10,000,000)】
+//DAI decimal
+const daiDecimal = 18;
+// 初始mint多少token
 const initialMint = '10000000000000000000000000';
+//授权
+const daiApproveAmount = ethers.utils.formatUnits('100000000000000000000000000000', daiDecimal);
 
 describe("===========================OlympusDao staking test===========================", function () {
     beforeEach(async function () {
@@ -46,6 +50,8 @@ describe("===========================OlympusDao staking test====================
         await deployContract();
         //合约部署之后的一些初始化
         await initAfterDeploy();
+        //测试质押
+        await stakingTest();
         // // 测试用户购买nft
         // await buyAndMint();
         // //批量查询
@@ -101,4 +107,15 @@ async function initAfterDeploy() {
     // 分红的份额是：IERC20(OHM).totalSupply().mul(_rate).div(1000000)
     await deployedDistributor.addRecipient(deployedStaking.address, initialRewardRate);
     console.log("initAfterDeploy finish");
+}
+
+async function stakingTest() {
+    console.log("stakingTest start");
+    let balance = await deployedDAI.balanceOf(staker1.address);
+    //授权和质押  TODO 不支持staking dai
+    await deployedDAI.connect(staker1).approve(deployedStaking.address, daiApproveAmount);
+    await deployedStaking.connect(staker1).staker1();
+
+    console.log("balance:", balance);
+    console.log("stakingTest finish");
 }
