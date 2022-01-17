@@ -1299,7 +1299,7 @@ contract sOlympus is ERC20Permit, Ownable {
       rebaseAmount = profit_;
     }
 
-    //sOHM的总供应量增加（rebaseAmount是uint256类型，不会是负数）
+    //sOHM的总供应量增加
     _totalSupply = _totalSupply.add(rebaseAmount);
 
     if (_totalSupply > MAX_SUPPLY) {
@@ -1336,8 +1336,7 @@ contract sOlympus is ERC20Permit, Ownable {
         totalStakedBefore: previousCirculating_,
         totalStakedAfter: circulatingSupply(),
         amountRebased: profit_,
-        index: ind
-        ex(),
+        index: index(),
         blockNumberOccured: block.number
       })
     );
@@ -1350,7 +1349,7 @@ contract sOlympus is ERC20Permit, Ownable {
 
   /**
    *  @notice 查询用户的sOHM份额（通过gon份额间接计算得出）
-   *  @param _amount uint   质押份额
+   *  @param who uint   用户地址
    */
   function balanceOf(address who) public view override returns (uint256) {
     //sOHM份额=gon份额/单位sOHM价值多少gon
@@ -1359,7 +1358,7 @@ contract sOlympus is ERC20Permit, Ownable {
 
   /**
    *  @notice 根据sOHM份额计算gon份额
-   *  @param _amount uint  sOHM份额
+   *  @param amount uint  sOHM份额
    *  @return uint256 返回gon份额
    */
   function gonsForBalance(uint256 amount) public view returns (uint256) {
@@ -1368,7 +1367,7 @@ contract sOlympus is ERC20Permit, Ownable {
 
   /**
    *  @notice 根据gon份额计算sOHM份额
-   *  @param _amount uint  gon份额
+   *  @param gons uint  gon份额
    *  @return uint256 返回sOHM份额
    */
   function balanceForGons(uint256 gons) public view returns (uint256) {

@@ -281,10 +281,13 @@ contract OlympusBondingCalculator is IBondingCalculator {
         k_ = reserve0.mul(reserve1).div( 10 ** decimals );
     }
 
+    //K的平方根 * 2 = (reserver0 * reserver1)平方根 * 2
     function getTotalValue( address _pair ) public view returns ( uint _value ) {
         _value = getKValue( _pair ).sqrrt().mul(2);
     }
 
+    //计算某个LP的指定份额价值多少OHM(无风险价值RFV)
+    //LP/TotalLp = 购买债券花费的LP份额/该LP当前总供应量  =FixedPoint.fraction( amount_, totalSupply ).decode112with18() 
     function valuation( address _pair, uint amount_ ) external view override returns ( uint _value ) {
         uint totalValue = getTotalValue( _pair );
         uint totalSupply = IUniswapV2Pair( _pair ).totalSupply();

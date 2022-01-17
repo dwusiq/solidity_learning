@@ -77,9 +77,9 @@ contract RedeemHelper is Ownable {
   address[] public bonds;
 
   /**
-   *  @notice 提取指定用户的债券收益(遍历所有债券，如果用户有购买这个债券，则提取)
+   *  @notice 提取指定用户的所有债券收益(遍历所有债券，如果用户有购买这个债券，则提取)
    *  @param _recipient address    收益者地址
-   *  @param pendingPayout_ uint  收益是否质押到staking合约
+   *  @param _stake uint  收益是否质押到staking合约
    */
   function redeemAll(address _recipient, bool _stake) external {
     for (uint256 i = 0; i < bonds.length; i++) {
