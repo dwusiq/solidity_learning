@@ -74,6 +74,9 @@ interface IERC20 {
   event Approval(address indexed owner, address indexed spender, uint256 value);
 }
 
+/**
+ * 用户质押OHM后，把sOHM转到该合约，等用户领取的时候再从这里转出去
+ */
 contract StakingWarmup {
 
     address public immutable staking;

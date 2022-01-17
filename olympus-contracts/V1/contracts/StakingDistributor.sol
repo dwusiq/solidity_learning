@@ -474,7 +474,7 @@ interface ITreasury {
   function mintRewards(address _recipient, uint256 _amount) external;
 }
 
-//Distributor：分配者（1、可以配置收益者的收益占总OHM供应的比例，2、给staking合约铸币用户质押分红）
+//Distributor：分配者（给staking合约铸币用户质押分红）
 contract Distributor is Policy {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;

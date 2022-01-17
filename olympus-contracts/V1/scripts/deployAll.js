@@ -15,7 +15,7 @@ const { ethers } = require("hardhat");
 let deployerAddress, mockDaoAddress;
 let ohmAddress = "0xEebDAd1513eA37399d47bCE63cc25739B7e5a243";
 let daiAddress = "0x5c086A8a5E7bcB2309843934bc399800d91817A5";
-let fraxAddress = "0x0B1C5B7DdFE6AEDc5AB6E559D12aE24292299e08";
+// let fraxAddress = "0x0B1C5B7DdFE6AEDc5AB6E559D12aE24292299e08";
 let sohmAddress = "0xa27D5AB633190f60A16C7EA43C73D87b7F9992C3";
 let stakingAddress = "0x0aE953379f04722364Cf51a373CFeB0B73ddd8B9";
 let stakingHelperAddress = "0x54CD241BADA492F7c87A2633AbdAfe919Dd2dBaB";
@@ -151,7 +151,7 @@ async function deployFrax() {
 
 //部署sOHM
 async function deploySOHM() {
-    const SOHM = await ethers.getContractFactory('sOlympus');
+    const SOHM = await ethers.getContractFactory('sOlympus');  //取用文件内的合约名称
     if (!sohmAddress || sohmAddress == "") {
         console.log("deploy sOlympus start");
         deployedSohm = await SOHM.deploy();
@@ -232,7 +232,8 @@ async function deployMockOlympusTreasury() {
     const Treasury = await ethers.getContractFactory('MockOlympusTreasury');
     if (!treasuryAddress || treasuryAddress == "") {
         console.log("deploy MockOlympusTreasury start");
-        deployedTreasury = await Treasury.deploy(ohmAddress, daiAddress, fraxAddress, 0);
+        // deployedTreasury = await Treasury.deploy(ohmAddress, daiAddress, fraxAddress, 0); 
+        deployedTreasury = await Treasury.deploy(ohmAddress, daiAddress, 0); // TODO 比原来案例减少了fraxToken参数
         treasuryAddress = deployedTreasury.address;
         await sleep(5000);
     } else {
@@ -296,7 +297,7 @@ async function main() {
     //部署DAI
     await deployDAI();
     //部署deployFrax
-    await deployFrax();
+    // await deployFrax();
     //部署sOHM
     await deploySOHM();
     //部署staking合约（依赖OHM、sOHM）
@@ -316,23 +317,23 @@ async function main() {
 
 
     // 铸币（测试用）【Deploy 10,000,000 mock DAI and mock Frax】
-    await waitTrans(await deployedFrax.mint(deployerAddress, initialMint), "daiMintTrans");
-    await waitTrans(await deployedFrax.mint(deployerAddress, initialMint), "fraxMintTrans");
+    await waitTrans(await deployedDai.mint(deployerAddress, initialMint), "daiMintTrans");
+    // await waitTrans(await deployedFrax.mint(deployerAddress, initialMint), "fraxMintTrans");
 
 
     // TODO queue and toggle DAI and Frax bond reserve depositor
     await waitTrans(await deployedTreasury.queue('0', daiBondAddress), "Treasury queue 0 daiBond");
-    await waitTrans(await deployedTreasury.queue('0', fraxBondAddress), "Treasury queue 0 fraxBond");
+    // await waitTrans(await deployedTreasury.queue('0', fraxBondAddress), "Treasury queue 0 fraxBond");
     await waitTrans(await deployedTreasury.toggle('0', daiBondAddress, zeroAddress), "Treasury toggle 0 daiBond");
-    await waitTrans(await deployedTreasury.toggle('0', fraxBondAddress, zeroAddress), "Treasury toggle 0 fraxBond");
+    // await waitTrans(await deployedTreasury.toggle('0', fraxBondAddress, zeroAddress), "Treasury toggle 0 fraxBond");
 
     // 配置债券信息（如：最低价、最大单笔交易等）【Set DAI and Frax bond terms】
     await waitTrans(await deployedDaiBond.initializeBondTerms(daiBondBCV, bondVestingLength, minBondPrice, maxBondPayout, bondFee, maxBondDebt, intialBondDebt), "daiBond initializeBondTerms");
-    await waitTrans(await deployedFraxBond.initializeBondTerms(fraxBondBCV, bondVestingLength, minBondPrice, maxBondPayout, bondFee, maxBondDebt, intialBondDebt), "fraxBond initializeBondTerms");
+    // await waitTrans(await deployedFraxBond.initializeBondTerms(fraxBondBCV, bondVestingLength, minBondPrice, maxBondPayout, bondFee, maxBondDebt, intialBondDebt), "fraxBond initializeBondTerms");
 
     // TODO 配置staking合约地址【Set staking for DAI and Frax bond】  TODO stakingAddress可以是staking或stakingHelper合约， 第二个入参是bool
     await waitTrans(await deployedDaiBond.setStaking(stakingAddress, stakingHelperAddress), "daiBond setStaking");
-    await waitTrans(await deployedFraxBond.setStaking(stakingAddress, stakingHelperAddress), "fraxBond setStaking");
+    // await waitTrans(await deployedFraxBond.setStaking(stakingAddress, stakingHelperAddress), "fraxBond setStaking");
 
     // sOHM初始化参数【Initialize sOHM and set the index】
     await waitTrans(await deployedSohm.initialize(stakingAddress), "sOhm initialize");
@@ -364,11 +365,11 @@ async function main() {
 
     // Approve the treasury to spend DAI and Frax
     await waitTrans(await deployedDai.approve(treasuryAddress, largeApproval), "dai approve treasuryAddress");
-    await waitTrans(await deployedFrax.approve(treasuryAddress, largeApproval), "frax approve treasuryAddress");
+    // await waitTrans(await deployedFrax.approve(treasuryAddress, largeApproval), "frax approve treasuryAddress");
 
     // Approve dai and frax bonds to spend deployer's DAI and Frax
     await waitTrans(await deployedDai.approve(daiBondAddress, largeApproval), "dai approve daiBondAddress");
-    await waitTrans(await deployedFrax.approve(fraxBondAddress, largeApproval), "frax approve fraxBondAddress");
+    // await waitTrans(await deployedFrax.approve(fraxBondAddress, largeApproval), "frax approve fraxBondAddress");
 
     // Approve staking and staking helper contact to spend deployer's OHM
     await waitTrans(await deployedOHM.approve(stakingAddress, largeApproval), "ohm approve stakingAddress");
@@ -389,7 +390,7 @@ async function main() {
 
     // Bond 1,000 OHM and Frax in each of their bonds
     await waitTrans(await deployedDaiBond.deposit('1000000000000000000000', '60000', deployerAddress), "deployedDaiBond deposit deployerAddress");
-    await waitTrans(await deployedFraxBond.deposit('1000000000000000000000', '60000', deployerAddress), "deployedFraxBond deposit deployerAddress");
+    // await waitTrans(await deployedFraxBond.deposit('1000000000000000000000', '60000', deployerAddress), "deployedFraxBond deposit deployerAddress");
 
 
     console.log("deploy finish");
