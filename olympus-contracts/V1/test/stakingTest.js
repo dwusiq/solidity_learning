@@ -6,20 +6,31 @@ const { assert, expect } = require("chai");
 const { expectRevert, time, BN } = require('@openzeppelin/test-helpers');
 
 let deployedOHM, deployedSOHM, deployedStaking, deployedDAI, deployedStakingWarmpup, deployedStakingHelper, deployedTreasury, deployedDistributor;
-let owner, daoUser, user2, user3, user4;
+let owner, daoUser, staker1, user3, user4;
 
 //参数
+// 用于计算index的参数，每次rebase结束之后保存记录时用到（好像就没有其它作用了）【Initial staking index】
+const initialIndex = '7675210820';
 //每个周期(Epoch)包含多少个区块（经过多少区块rebase一次）【 How many blocks are in each epoch】
 const epochLengthInBlocks = '2200';
 // 首个周期(Epoch)的起始区块，如果为空则取当前区块【What epoch will be first epoch】
 let firstEpochNumber = '';
 //首个周期(Epoch)的结束区块,如果为空，则默认开始块+每个周期（epoch）的区块数（如果设置了首个结束区块，则首个epoch的结束区块不受epochLengthInBlocks影响）
 let firstEpochBlock = '';
-let blocksNeededForQueue = 0; // TODO 不知道有什么用，这里跟官方脚本一样，设置为0
+// TODO 不知道有什么用，这里跟官方脚本一样，设置为0
+let blocksNeededForQueue = 0;
+// 初始收益比例（影响到OHM产量）【Initial reward rate for epoch】
+// 每次rebase给staking合约mint的用于staker分红的OHM份额：IERC20(OHM).totalSupply().mul(_rate).div(1000000)
+const initialRewardRate = '3000';
+
+
+//for test
+// 初始mint多少token【Initial mint for DAI (10,000,000)】
+const initialMint = '10000000000000000000000000';
 
 describe("===========================OlympusDao staking test===========================", function () {
     beforeEach(async function () {
-        [owner, daoUser, user2, user3, user4] = await ethers.getSigners();
+        [owner, daoUser, staker1, user3, user4] = await ethers.getSigners();
 
         //默认，首个周期（epoch）起始区块从当前块开始
         if (!firstEpochNumber || firstEpochNumber == "")
@@ -33,6 +44,8 @@ describe("===========================OlympusDao staking test====================
     it("OlympusDao staking test", async function () {
         //部署合约
         await deployContract();
+        //合约部署之后的一些初始化
+        await initAfterDeploy();
         // // 测试用户购买nft
         // await buyAndMint();
         // //批量查询
@@ -46,6 +59,9 @@ describe("===========================OlympusDao staking test====================
 });
 
 
+/**
+ * 部署合约
+ */
 async function deployContract() {
     deployedOHM = await deployOHM();
     deployedSOHM = await deploySOHM();
@@ -55,6 +71,31 @@ async function deployContract() {
     deployedTreasury = await deployTreasury(deployedOHM.address, deployedDAI.address, blocksNeededForQueue);
     deployedDistributor = await deployDistributor(deployedTreasury.address, deployedOHM.address, epochLengthInBlocks, firstEpochBlock);
 
-     //StakingHelper并非必须合约
-     deployedStakingHelper = await deployStakingHelper(deployedStaking.address, deployedSOHM.address);
+    //StakingHelper并非必须合约
+    deployedStakingHelper = await deployStakingHelper(deployedStaking.address, deployedSOHM.address);
+}
+
+/**
+ * 合约部署之后进行一些初始化
+ */
+async function initAfterDeploy() {
+    //给测试用户mint一些DAI
+    await deployedDAI.mint(staker1, initialMint)
+
+
+    //初始化sOHM的参数
+    await deployedSOHM.initialize(deployedStaking.address);
+    await deployedSOHM.setIndex(initialIndex);
+
+    //初始化staking合约参数(设置一些依赖的合约地址)
+    await deployedStaking.setContract('0', deployedDistributor.address);
+    await deployedStaking.setContract('1', deployedStakingWarmpup.address);
+
+    //初始化OHM
+    await deployedOHM.setVault(deployedTreasury.address); //只有这个地址允许调用OHM的mint
+
+    // ！！！！！！！这一步相当重要，关系到给用户的收益
+    // 每次rebase时，distributor合约会给staking合铸造OHM用于质押分红
+    // 分红的份额是：IERC20(OHM).totalSupply().mul(_rate).div(1000000)
+    await deployedDistributor.addRecipient(deployedStaking.address, initialRewardRate)
 }
