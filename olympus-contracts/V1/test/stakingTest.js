@@ -63,6 +63,7 @@ describe("===========================OlympusDao staking test====================
  * 部署合约
  */
 async function deployContract() {
+    console.log("deployContract start");
     deployedOHM = await deployOHM();
     deployedSOHM = await deploySOHM();
     deployedDAI = await deployDAI();
@@ -72,16 +73,17 @@ async function deployContract() {
     deployedDistributor = await deployDistributor(deployedTreasury.address, deployedOHM.address, epochLengthInBlocks, firstEpochBlock);
 
     //StakingHelper并非必须合约
-    deployedStakingHelper = await deployStakingHelper(deployedStaking.address, deployedSOHM.address);
+    deployedStakingHelper = await deployStakingHelper(deployedStaking.address, deployedOHM.address);
+    console.log("deployContract finish");
 }
 
 /**
  * 合约部署之后进行一些初始化
  */
 async function initAfterDeploy() {
+    console.log("initAfterDeploy start");
     //给测试用户mint一些DAI
-    await deployedDAI.mint(staker1, initialMint)
-
+    await deployedDAI.mint(staker1.address, initialMint)
 
     //初始化sOHM的参数
     await deployedSOHM.initialize(deployedStaking.address);
@@ -97,5 +99,6 @@ async function initAfterDeploy() {
     // ！！！！！！！这一步相当重要，关系到给用户的收益
     // 每次rebase时，distributor合约会给staking合铸造OHM用于质押分红
     // 分红的份额是：IERC20(OHM).totalSupply().mul(_rate).div(1000000)
-    await deployedDistributor.addRecipient(deployedStaking.address, initialRewardRate)
+    await deployedDistributor.addRecipient(deployedStaking.address, initialRewardRate);
+    console.log("initAfterDeploy finish");
 }
