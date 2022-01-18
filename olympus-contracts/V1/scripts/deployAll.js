@@ -351,9 +351,13 @@ async function main() {
     // 每次rebase给stakingmint的用于staker分红的OHM份额：IERC20(OHM).totalSupply().mul(_rate).div(1000000)
     await waitTrans(await deployedDistributor.addRecipient(stakingAddress, initialRewardRate), "DistributorContract addRecipient");
 
-    // queue and toggle reward manager TODO 这个有什么用
+    // queue and toggle reward manager 
     await waitTrans(await deployedTreasury.queue('8', distributorAddress), "Treasury queue 8 distributorAddress");
     await waitTrans(await deployedTreasury.toggle('8', distributorAddress, zeroAddress), "Treasury toggle 8 distributorAddress");
+
+    //------------
+    //以下可能是测试
+    //------------
 
     // queue and toggle deployer reserve depositor
     await waitTrans(await deployedTreasury.queue('0', deployerAddress), "Treasury queue 0 deployerAddress");
@@ -374,10 +378,6 @@ async function main() {
     // Approve staking and staking helper contact to spend deployer's OHM
     await waitTrans(await deployedOHM.approve(stakingAddress, largeApproval), "ohm approve stakingAddress");
     await waitTrans(await deployedOHM.approve(stakingHelperAddress, largeApproval), "ohm approve stakingHelperAddress");
-
-    //------------
-    //以下可能是测试
-    //------------
 
     // Deposit 9,000,000 DAI to treasury, 600,000 OHM gets minted to deployer and 8,400,000 are in treasury as excesss reserves
     await waitTrans(await deployedTreasury.deposit('9000000000000000000000000', daiAddress, '8400000000000000'), "Treasury deposit dai");

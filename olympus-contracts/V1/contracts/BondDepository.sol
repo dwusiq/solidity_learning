@@ -1117,9 +1117,9 @@ contract OlympusBondDepository is Ownable {
             _maxPrice >= nativePrice,
             "Slippage limit: more than max price"
         ); // slippage protection
-        //计算指定资产的份额价值多少OHM
+        //计算指定资产的份额价值多少OHM(无风险价值)
         uint256 value = ITreasury(treasury).valueOf(principle, _amount);
-        //判断买入的这些份额，协议会给他多少回报【payout to bonder is computed】
+        //判断买入的这些份额，协议会给他多少回报(OHM)【payout to bonder is computed】
         uint256 payout = payoutFor(value);
 
         require(payout >= 10000000, "Bond too small"); // must be > 0.01 OHM ( underflow protection )
@@ -1279,7 +1279,7 @@ contract OlympusBondDepository is Ownable {
     /* ======== VIEW FUNCTIONS ======== */
 
     /**
-     *  @notice 必须小于债券允许消费的最大值【determine maximum bond size】
+     *  @notice 必须小于债券允许消费的最大值(OHM)【determine maximum bond size】
      *  @return uint
      */
     function maxPayout() public view returns (uint256) {
@@ -1287,7 +1287,7 @@ contract OlympusBondDepository is Ownable {
     }
 
     /**
-     *  @notice 判断买入的这些份额，协议会给他多少回报【calculate interest due for new bond】
+     *  @notice 判断买入的这些份额，协议会给他多少回报(OHM)【calculate interest due for new bond】
      *  @param _value uint
      *  @return uint
      */

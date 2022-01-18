@@ -826,7 +826,7 @@ contract OlympusStaking is Ownable {
       epoch.endBlock = epoch.endBlock.add(epoch.length);
       epoch.number++;
 
-      //分配分红（按OHMd）这一步的作用就是确定下一个周期总共产生多少OHM给所有质押者
+      //分配分红（按OHM）,给分红地址铸造OHM
       if (distributor != address(0)) {
         IDistributor(distributor).distribute();
       }

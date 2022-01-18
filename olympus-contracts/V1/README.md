@@ -24,13 +24,10 @@ npm install
   - `sOHM`份额=`gon`份额/`_gonsPerFragment`，其中`_gonsPerFragment`跟`_totalSupply`成反比，`_gonsPerFragment`表示每单位`sOHM`价值多少`gon`
   - 每次调用`rebase`函数都会执行`_gonsPerFragment = TOTAL_GONS.div(_totalSupply);`,由`balanceOf`接口得知，则用户持有相同`gon`的前提下，`_gonsPerFragment`越小，则`sOHM`值越大
 * `distributor`合约的关注点（这个合约解决了分红`OHM`的来源）
-  
   - 这个合约配置在每个周期(`epoch`)给`staking`合约铸造多少`OHM`，这些`OHM`份额就是`staker`的收益来源
-  
   - `await deployedDistributor.addRecipient(stakingAddress, initialRewardRate)`就是配置每周期的分红总额
-  
   - 每次`staking`合约触发`rebase`都会调用`IDistributor(distributor).distribute()`产出用于分红的`OHM`
-  
   - 因此每个周期都会有新的`OHM`产生
+* 最开始的`OHM`来源
   
     

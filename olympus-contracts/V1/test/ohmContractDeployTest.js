@@ -68,6 +68,23 @@ async function deployDistributor(treasuryAddress, ohmAddress, epochLengthInBlock
 }
 
 
+//部署DaiBondDepository（生产按实际初始化相关资产地址）
+async function deployDaiBond(ohmAddress, daiAddress, treasuryAddress, daoAddress, zeroAddress) {
+    const DaiBondDepository = await ethers.getContractFactory('MockOlympusBondDepository');
+    const deployedDaiBond = await DaiBondDepository.deploy(ohmAddress, daiAddress, treasuryAddress, daoAddress, zeroAddress);
+    console.log("DaiBondDepository deploy finish,deployedDaiBondAddress: %s", deployedDaiBond.address);
+    return deployedDaiBond;
+}
+
+
+//只有在支持lp质押时才部署OlympusBondingCalculator（依赖OHM）
+async function deployOlympusBondingCalculator(ohmAddress) {
+    const OlympusBondingCalculator = await ethers.getContractFactory('OlympusBondingCalculator');
+    const deployedCalculator = await OlympusBondingCalculator.deploy(ohmAddress);
+    console.log("OlympusBondingCalculator deploy finish,calculatorBondAddress: %s", deployedCalculator.address);
+    return deployedCalculator;
+}
+
 module.exports = {
     deployOHM,
     deploySOHM,
@@ -76,5 +93,7 @@ module.exports = {
     deployStakingWarmup,
     deployStakingHelper,
     deployTreasury,
-    deployDistributor
+    deployDistributor,
+    deployDaiBond,
+    deployOlympusBondingCalculator
 }

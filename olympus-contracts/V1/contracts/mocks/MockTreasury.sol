@@ -295,6 +295,16 @@ contract MockOlympusTreasury is Ownable {
     bool result
   );
 
+    // RESERVEDEPOSITOR:0-允许存入储备金
+    // RESERVESPENDER:1-允许提现储备金
+    // RESERVETOKEN:2-允许成为合约支持的储备金
+    // RESERVEMANAGER:3-允许管理储备金（有这个权限可以提取当前合约的储备金）
+    // LIQUIDITYDEPOSITOR:4-允许存入LpToken
+    // LIQUIDITYTOKEN:5-允许允许成为合约支持的lpToken
+    // LIQUIDITYMANAGER:6-允许管理lpToken（有这个权限可以提取当前合约的lpToken）
+    // DEBTOR:7-允许借用储备金
+    // REWARDMANAGER:8-允许铸造OHM给其它用户
+    // SOHM:9-sohm代币
   enum MANAGING {
     RESERVEDEPOSITOR,
     RESERVESPENDER,
@@ -400,7 +410,7 @@ contract MockOlympusTreasury is Ownable {
     }
 
     uint256 value = valueOfToken(_token, _amount);
-    (_token, _amount);
+    // (_token, _amount);
     // mint OHM needed and store amount of rewards for distribution
     send_ = value.sub(_profit);
     IERC20Mintable(OHM).mint(msg.sender, send_);

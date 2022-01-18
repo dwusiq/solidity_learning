@@ -304,16 +304,16 @@ contract OlympusTreasury is Ownable {
         bool result
     );
 
-    // RESERVEDEPOSITOR:允许存入储备金
-    // RESERVESPENDER:允许提现储备金
-    // RESERVETOKEN:允许成为合约支持的储备金
-    // RESERVEMANAGER:允许管理储备金（有这个权限可以提取当前合约的储备金）
-    // LIQUIDITYDEPOSITOR:允许存入LpToken
-    // LIQUIDITYTOKEN:允许允许成为合约支持的lpToken
-    // LIQUIDITYMANAGER:允许管理lpToken（有这个权限可以提取当前合约的lpToken）
-    //DEBTOR
-    // REWARDMANAGER:允许铸造OHM给其它用户
-    //
+    // RESERVEDEPOSITOR:0-允许存入储备金
+    // RESERVESPENDER:1-允许提现储备金
+    // RESERVETOKEN:2-允许成为合约支持的储备金
+    // RESERVEMANAGER:3-允许管理储备金（有这个权限可以提取当前合约的储备金）
+    // LIQUIDITYDEPOSITOR:4-允许存入LpToken
+    // LIQUIDITYTOKEN:5-允许允许成为合约支持的lpToken
+    // LIQUIDITYMANAGER:6-允许管理lpToken（有这个权限可以提取当前合约的lpToken）
+    // DEBTOR:7-允许借用储备金
+    // REWARDMANAGER:8-允许铸造OHM给其它用户
+    // SOHM:9-sohm代币
     enum MANAGING {
         RESERVEDEPOSITOR,
         RESERVESPENDER,
@@ -541,10 +541,11 @@ contract OlympusTreasury is Ownable {
     }
 
     /**
-        @notice send epoch reward to staking contract
+     * @notice 每个rebase周期都给staking合约铸造用于质押分红的OHM【send epoch reward to staking contract】
      */
     function mintRewards(address _recipient, uint256 _amount) external {
         require(isRewardManager[msg.sender], "Not approved");
+        //限制：铸造的OHM,都必须有储备金支撑（即铸造的OHM总价值不能多余储备金的总价值）
         require(_amount <= excessReserves(), "Insufficient reserves");
 
         IERC20Mintable(OHM).mint(_recipient, _amount);
@@ -553,15 +554,15 @@ contract OlympusTreasury is Ownable {
     }
 
     /**
-        @notice returns excess reserves not backing tokens
-        @return uint
+     * @notice 查询还有多少储备金没有用来支撑OHM的（即还能铸造多少OHM）【returns excess reserves not backing tokens】
+     * @return uint
      */
     function excessReserves() public view returns (uint256) {
         return totalReserves.sub(IERC20(OHM).totalSupply().sub(totalDebt));
     }
 
     /**
-        @notice takes inventory of all tracked assets
+        @notice 重新盘点当前合约储备的所有`Token`的总价值【takes inventory of all tracked assets】
         @notice always consolidate to recognized reserves before audit
      */
     function auditReserves() external onlyManager {

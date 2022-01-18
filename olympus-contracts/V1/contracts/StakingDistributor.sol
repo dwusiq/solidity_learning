@@ -526,7 +526,7 @@ contract Distributor is Policy {
    * @notice  分配分红【send epoch reward to staking contract】
    */
   function distribute() external returns (bool) {
-    if (nextEpochBlock <= block.number) {
+    if (nextEpochBlock <= block.number) { 
       nextEpochBlock = nextEpochBlock.add(epochLength); // set next epoch block
 
       // distribute rewards to each recipient
