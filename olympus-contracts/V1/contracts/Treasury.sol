@@ -328,9 +328,10 @@ contract OlympusTreasury is Ownable {
     }
 
     address public immutable OHM;
+    //用户被添加地址到变更授权的队列后，要等待几个区块之后才能进行实际操作
     uint256 public immutable blocksNeededForQueue;
 
-    address[] public reserveTokens; // Push only, beware false-positives.
+    address[] public reserveTokens; //这类型的数组都智能添加，不能删除，有误报的可能，（不知道干嘛用，如果可以尽量不用）【 Push only, beware false-positives.】
     mapping(address => bool) public isReserveToken;
     mapping(address => uint256) public reserveTokenQueue; // Delays changes to mapping.
 
@@ -611,9 +612,9 @@ contract OlympusTreasury is Ownable {
     }
 
     /**
-     * @notice queue address to change boolean in mapping
-     * @param _managing MANAGING
-     * @param _address address
+     * @notice 添加地址到变更授权的队列(调toggle前要先调这个接口添加地址，并且有等待期)【queue address to change boolean in mapping】
+     * @param _managing MANAGING   授权类型的
+     * @param _address address     被授权的地址
      * @return bool
      */
     function queue(MANAGING _managing, address _address)
@@ -675,7 +676,7 @@ contract OlympusTreasury is Ownable {
     }
 
     /**
-        @notice verify queue then set boolean in mapping
+        @notice （事先添加到queue，并且过了等待期后，可以调这个接口）检查队列，并且切换用户的授权状态。【verify queue then set boolean in mapping】
         @param _managing MANAGING
         @param _address address
         @param _calculator address
@@ -705,13 +706,17 @@ contract OlympusTreasury is Ownable {
             result = !isReserveDepositor[_address];
             isReserveDepositor[_address] = result;
         } else if (_managing == MANAGING.RESERVESPENDER) {
-            // 1
+            // 判断地址是否未授权，并且未授权的是否过了队列等待期
+            // false:已授权    true：未授权，且在队列中，且队列等待期已到
             if (requirements(reserveSpenderQueue, isReserveSpender, _address)) {
+                //队列中移除该地址
                 reserveSpenderQueue[_address] = 0;
+                //添加到数组中(由此可见，如果重复操作，数组可能有重复的数据)
                 if (!listContains(reserveSpenders, _address)) {
                     reserveSpenders.push(_address);
                 }
             }
+            //切换用户的授权状态
             result = !isReserveSpender[_address];
             isReserveSpender[_address] = result;
         } else if (_managing == MANAGING.RESERVETOKEN) {
@@ -811,19 +816,22 @@ contract OlympusTreasury is Ownable {
     }
 
     /**
-        @notice checks requirements and returns altered structs
-        @param queue_ mapping( address => uint )
-        @param status_ mapping( address => bool )
-        @param _address address
-        @return bool 
+        @notice 判断地址是否未授权，并且未授权的是否过了队列等待期【checks requirements and returns altered structs】
+        @param queue_ mapping( address => uint )    队列<地址=>等待结束区块>
+        @param status_ mapping( address => bool )   授权状态<地址=>是否授权>
+        @param _address address   被检查的地址
+        @return bool     false:已授权    true：未授权，且在队列中，且队列等待期已到，
      */
     function requirements(
         mapping(address => uint256) storage queue_,
         mapping(address => bool) storage status_,
         address _address
     ) internal view returns (bool) {
+        //判断地址是否已授权， false:已授权    true：未授权，且在队列中，且队列等待期已到，
         if (!status_[_address]) {
+            //检验该地址是否已添加到队列中
             require(queue_[_address] != 0, "Must queue");
+            //检验该地址添加到队列后，是否过了需要等待的区块个数
             require(queue_[_address] <= block.number, "Queue not expired");
             return true;
         }

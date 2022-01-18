@@ -30,7 +30,7 @@ const daiDecimal = 18;
 // 初始mint多少token
 const initialMint = '10000000000000000000000000';
 //授权
-const daiApproveAmount = ethers.utils.formatUnits('100000000000000000000000000000', daiDecimal);
+const daiApproveAmount = ethers.utils.parseUnits('100000000000000000000000000000', daiDecimal);
 
 describe("===========================OlympusDao staking test===========================", function () {
     beforeEach(async function () {
@@ -114,7 +114,7 @@ async function stakingTest() {
     let balance = await deployedDAI.balanceOf(staker1.address);
     //授权和质押  TODO 不支持staking dai
     await deployedDAI.connect(staker1).approve(deployedStaking.address, daiApproveAmount);
-    await deployedStaking.connect(staker1).staker1();
+    // await deployedStaking.connect(staker1).staker1();
 
     console.log("balance:", balance);
     console.log("stakingTest finish");
