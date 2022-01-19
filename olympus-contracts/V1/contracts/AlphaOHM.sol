@@ -208,12 +208,13 @@ contract Divine is Ownable, ERC20 {
 }
 
 /**
- * 预售OHM,预售期用户购买得到这个币，项目启动后可以到AlphaOhmMigration兑换OHM.
+ * 预售期用户购买得到这个币，项目启动后可以到AlphaOhmMigration 1:1兑换OHM.
  * TODO 这个合约在github没有开源，我在前端代码找到地址，然后在浏览器下载的。
  */
 contract AlphaOHM is Divine {
 
     constructor() Divine("Alpha Olympus", "alphaOHM", 9) {
+      //计划预售的份额（先给owner,再由owner转到预售合约）
         _mint(_owner, 50000000000000);
     }
 

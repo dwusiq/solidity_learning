@@ -1,4 +1,4 @@
-const { deployOHM, deploySOHM, deployDAI, deployStaking, deployStakingWarmup, deployStakingHelper, deployTreasury, deployDistributor, deployDaiBond } = require("./ohmContractDeployTest.js");
+const { deployOHM, deploySOHM, deployDAI, deployStaking, deployStakingWarmup, deployStakingHelper, deployTreasury, deployDistributor, deployDaiBond, deployAlphaOHM: deployAlphAOHM, deployAohmMigration, deployOHMPresale } = require("./ohmContractDeployTest.js");
 
 const { BigNumber } = require('ethers');
 const { ethers } = require('hardhat');
@@ -7,7 +7,27 @@ const { expectRevert, time, BN } = require('@openzeppelin/test-helpers');
 
 let deployedOHM, deployedSOHM, deployedStaking, deployedDAI, deployedStakingWarmpup;
 let deployedStakingHelper, deployedTreasury, deployedDistributor, deployedDaiBond;
-let owner, daoUser, staker1, user3, user4;
+let deployedAlphaOHM, deployedAohmMigration, deployedOHMPresale;
+let owner, presaleDaiReceiptor, daoUser, staker1, user3, user4;
+
+
+
+//for test
+// 初始mint多少dai
+const daiDecimal = 18;
+const initialDaiMint = ethers.utils.parseUnits('1000000000', daiDecimal);
+const staker1PresalUseDaiAmount = ethers.utils.parseUnits('10000', daiDecimal);
+const daiApproveAmount = ethers.utils.parseUnits('100000000000000000000000000000', daiDecimal);
+// 初始mint多少ohm
+const ohmDecimal = 9;
+// const initialOhmMint = ethers.utils.parseUnits('100000', ohmDecimal);
+// const ohmApproveAmount = ethers.utils.parseUnits('10000000000000000', ohmDecimal);
+
+
+//for preSale（生产根据实际填写）
+const aOhmSalePrice = ethers.utils.parseUnits('0.5', daiDecimal);  //预售期0.5个dai买一个aOHM
+const aOhmSaleLength = 86400000;  //1天=86400000
+const aOHMDuration = 10;//预售结束后，aohm兑换ohm的窗口开放时长（多少个区块）
 
 //for staking
 // 用于计算index的参数，每次rebase结束之后保存记录时用到（好像就没有其它作用了）【Initial staking index】
@@ -45,30 +65,28 @@ const maxBondDebt = '1000000000000000';
 const intialBondDebt = '0'
 
 
-//for test
-// 初始mint多少dai
-const daiDecimal = 18;
-const initialDaiMint = ethers.utils.parseUnits('1000000000', daiDecimal);
-const daiApproveAmount = ethers.utils.parseUnits('100000000000000000000000000000', daiDecimal);
-// 初始mint多少ohm
-const ohmDecimal = 9;
-const initialOhmMint = ethers.utils.parseUnits('100000', ohmDecimal);
-const ohmApproveAmount = ethers.utils.parseUnits('10000000000000000', ohmDecimal);
 
-describe("===========================OlympusDao staking test===========================", function () {
+describe("===========================OlympusDao test===========================", function () {
     beforeEach(async function () {
-        [owner, daoUser, staker1, bonder1, user3, user4] = await ethers.getSigners();
+        [owner, presaleDaiReceiptor, daoUser, staker1, bonder1, user3, user4] = await ethers.getSigners();
         defaultAndPrintParam();
     });
 
 
-    it("OlympusDao staking test", async function () {
+    it("OlympusDao test", async function () {
+
+        await ethers.provider.getBlockNumber().then((blockNumber) => {
+            console.log("Current block number: " + blockNumber);
+        });
+
         //部署合约
         await deployContract();
-        //合约部署之后的一些初始化
-        await initAfterDeploy();
+        //预售之前的一些初始配置
+        await initForPresale();
+        //预售完成之后，在项目正式启动前要初始化一些配置
+        // await initBeforeProjectRun();
         //债券测试
-        await bondTest();
+        // await bondTest();
         //测试质押
         // await stakingTest();
 
@@ -89,7 +107,13 @@ describe("===========================OlympusDao staking test====================
  * 部署合约
  */
 async function deployContract() {
-    console.log("deployContract start");
+    console.log(">>>>>> deployContract start");
+    //部署预售相关合约
+    deployedAlphaOHM = await deployAlphAOHM();
+    deployedOHMPresale = await deployOHMPresale();
+    deployedAohmMigration = await deployAohmMigration();
+
+    //部署项目正常运行的合约
     deployedOHM = await deployOHM();
     deployedSOHM = await deploySOHM();
     deployedDAI = await deployDAI();
@@ -100,8 +124,51 @@ async function deployContract() {
     deployedDaiBond = await deployDaiBond(deployedOHM.address, deployedDAI.address, deployedTreasury.address, daoUser.address, zeroAddress);
     //StakingHelper并非必须合约
     deployedStakingHelper = await deployStakingHelper(deployedStaking.address, deployedOHM.address);
-    console.log("deployContract finish");
+    console.log(">>>>>> deployContract finish");
 }
+
+/**
+ * 预售相关配置
+ */
+async function initForPresale() {
+    console.log(">>>>>> initForPresale start");
+    console.log("before initForPresale，aohmBalanceOfOwner:%s, aohmBalanceOfSaleContract:%s", ethers.utils.formatUnits(await deployedAlphaOHM.balanceOf(owner.address), ohmDecimal), ethers.utils.formatUnits(await deployedAlphaOHM.balanceOf(deployedOHMPresale.address), ohmDecimal));
+    await deployedOHMPresale.initialize(presaleDaiReceiptor.address, deployedDAI.address, deployedAlphaOHM.address, aOhmSalePrice, aOhmSaleLength);
+    await deployedAlphaOHM.connect(owner).transfer(deployedOHMPresale.address, await deployedAlphaOHM.balanceOf(owner.address));
+    console.log("after initForPresale，aohmBalanceOfOwner:%s, aohmBalanceOfSaleContract:%s", ethers.utils.formatUnits(await deployedAlphaOHM.balanceOf(owner.address), ohmDecimal), ethers.utils.formatUnits(await deployedAlphaOHM.balanceOf(deployedOHMPresale.address), ohmDecimal));
+    console.log(">>>>>> initForPresale fihish");
+}
+
+/**
+ * 预售进行
+ */
+async function presaleOHM() {
+    console.log(">>>>>> presaleOHM start");
+
+    await deployedOHMPresale.initialize(presaleDaiReceiptor.address, deployedDAI.address, deployedAlphaOHM.address, aOhmSalePrice, aOhmSaleLength);
+    console.log(">>>>>> presaleOHM start");
+
+}
+
+/**
+ * 兑换合约配置（aOHM兑换ohm）
+ */
+async function initForMigration() {
+
+}
+
+/**
+ * 兑换（aOHM兑换ohm）
+ */
+async function migration() {
+    const aOhmSalePrice = ethers.utils.parseUnits('0.5', daiDecimal);  //预售期0.5个dai买一个aOHM
+    const aOhmSaleLength = 86400000;  //1天=86400000
+    const aOHMDuration = 10;//预售结束后，aohm兑换ohm的窗口开放时长（多少个区块）
+
+}
+
+
+
 
 /**
  * 合约部署之后进行一些初始化
@@ -148,7 +215,7 @@ async function initAfterDeploy() {
     //专为测试的初始化
     //init for test
     //给测试用户mint一些DAI
-    await deployedDAI.mint(bonder1.address, initialDaiMint);
+    await deployedDAI.mint(staker1.address, initialDaiMint);
     console.log("bonder1 default daiBalance:%s", ethers.utils.formatUnits(await deployedDAI.balanceOf(bonder1.address), daiDecimal));
 
     console.log("initAfterDeploy finish");
@@ -169,8 +236,8 @@ async function stakingTest() {
 
 async function bondTest() {
     console.log("bondTest start");
-    
-    console.log("bondPrice:%s",await deployedDaiBond.bondPrice());
+
+    console.log("bondPrice:%s", await deployedDaiBond.bondPrice());
     // console.log("bondPrice:%s", ethers.utils.formatUint(await deployedDaiBond.bondPrice(), daiDecimal));
 
 
@@ -191,8 +258,6 @@ async function defaultAndPrintParam() {
     //默认，首个周期（epoch）结束区块=起始区块+每个周期（epoch）的区块数
     if (!firstEpochBlock || firstEpochBlock == "")
         firstEpochBlock = firstEpochNumber + parseInt(epochLengthInBlocks);
-    if (!mockDaoAddress || mockDaoAddress == "")
-        mockDaoAddress = deployerAddress;
 
     console.log("firstEpochNumber: %s", firstEpochNumber);
     console.log("epochLengthInBlocks: %s", epochLengthInBlocks);

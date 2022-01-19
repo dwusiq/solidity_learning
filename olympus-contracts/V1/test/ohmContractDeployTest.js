@@ -85,6 +85,43 @@ async function deployOlympusBondingCalculator(ohmAddress) {
     return deployedCalculator;
 }
 
+
+
+/**
+ * 部署OHMPresale，用户参与预售
+ */
+async function deployOHMPresale() {
+    const OHMPresale = await ethers.getContractFactory('OHMPresale');
+    const deployedOHMPresale = await OHMPresale.deploy();
+    console.log("OHMPresale deploy finish,oHMPreSaleAddress: %s", deployedOHMPresale.address);
+    return deployedOHMPresale;
+}
+
+
+/**
+ * 部署AlphaOHM，用于预售支付给用户的代币
+ */
+async function deployAlphaOHM() {
+    const AlphaOHM = await ethers.getContractFactory('AlphaOHM');
+    const deployedAlphaOHM = await AlphaOHM.deploy();
+    console.log("AlphaOHM deploy finish,alphaOHMAddress: %s", deployedAlphaOHM.address);
+    return deployedAlphaOHM;
+}
+
+/**
+ * 部署deployedAohmMigration用于支持参与预售的用户兑换OHM.
+ */
+async function deployAohmMigration() {
+    const AohmMigration = await ethers.getContractFactory('AohmMigration');
+    const deployedAohmMigration = await AohmMigration.deploy();
+    console.log("AohmMigration deploy finish,aohmMigrationAddress: %s", deployedAohmMigration.address);
+    return deployedAohmMigration;
+}
+
+
+
+
+
 module.exports = {
     deployOHM,
     deploySOHM,
@@ -95,5 +132,8 @@ module.exports = {
     deployTreasury,
     deployDistributor,
     deployDaiBond,
-    deployOlympusBondingCalculator
+    deployOlympusBondingCalculator,
+    deployAlphaOHM,
+    deployAohmMigration,
+    deployOHMPresale
 }
