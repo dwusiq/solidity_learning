@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity 0.7.5;
 
+import "@nomiclabs/buidler/console.sol";
+
 interface IOwnable {
   function policy() external view returns (address);
 
@@ -1083,6 +1085,7 @@ contract MockOlympusBondDepository is Ownable {
 
     uint256 priceInUSD = bondPriceInUSD(); // Stored in bond info
     uint256 nativePrice = _bondPrice();
+    console.log(">>> nativePrice",nativePrice);
 
     require(_maxPrice >= nativePrice, "Slippage limit: more than max price"); // slippage protection
 

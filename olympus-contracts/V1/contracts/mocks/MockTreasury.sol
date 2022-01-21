@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity 0.7.5;
 
+// import "@nomiclabs/buidler/console.sol";
+
+
 library SafeMath {
   function add(uint256 a, uint256 b) internal pure returns (uint256) {
     uint256 c = a + b;
@@ -403,6 +406,7 @@ contract MockOlympusTreasury is Ownable {
     require(isReserveToken[_token] || isLiquidityToken[_token], "Not accepted");
     IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
 
+      // console.log(">>sender:%s",msg.sender);
     if (isReserveToken[_token]) {
       require(isReserveDepositor[msg.sender], "Not approved");
     } else {
@@ -410,7 +414,8 @@ contract MockOlympusTreasury is Ownable {
     }
 
     uint256 value = valueOfToken(_token, _amount);
-    // (_token, _amount);
+    // console.log("_amount",_amount);
+    // console.log("value",value);
     // mint OHM needed and store amount of rewards for distribution
     send_ = value.sub(_profit);
     IERC20Mintable(OHM).mint(msg.sender, send_);

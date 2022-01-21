@@ -8,15 +8,15 @@ const { expectRevert, time, BN } = require('@openzeppelin/test-helpers');
 let deployedOHM, deployedSOHM, deployedStaking, deployedDAI, deployedStakingWarmpup;
 let deployedStakingHelper, deployedTreasury, deployedDistributor, deployedDaiBond;
 let deployedAlphaOHM, deployedAohmMigration, deployedOHMPresale;
-let owner, presaleDaiReceiptor, daoUser, staker1, user3, user4;
+let deployer, presaleDaiReceiptor, daoUser, staker1, user3, user4;
 
 
 
 //for test
 // 初始mint多少dai
 const daiDecimal = 18;
-const initialDaiMint = ethers.utils.parseUnits('1000000000', daiDecimal);
-const staker1PresalUseDaiAmount = ethers.utils.parseUnits('10000', daiDecimal);
+const initialDaiMintStr = "1000";
+const initialDaiMint = ethers.utils.parseUnits(initialDaiMintStr, daiDecimal);
 const daiApproveAmount = ethers.utils.parseUnits('100000000000000000000000000000', daiDecimal);
 // 初始mint多少ohm
 const ohmDecimal = 9;
@@ -25,9 +25,10 @@ const ohmDecimal = 9;
 
 
 //for preSale（生产根据实际填写）
-const aOhmSalePrice = ethers.utils.parseUnits('0.5', daiDecimal);  //预售期0.5个dai买一个aOHM
-const aOhmSaleLength = 86400000;  //1天=86400000
-const aOHMDuration = 10;//预售结束后，aohm兑换ohm的窗口开放时长（多少个区块）
+const aOhmSalePriceStr = "0.5";//预售期0.5个dai买一个aOHM
+const aOhmSalePrice = ethers.utils.parseUnits(aOhmSalePriceStr, daiDecimal);  //预售期0.5个dai买一个aOHM
+const aOhmSaleLength = 30 * 86400000;  //1天=86400000
+const aOHMDuration = 100;//预售结束后，aohm兑换ohm的窗口开放时长（多少个区块）
 
 //for staking
 // 用于计算index的参数，每次rebase结束之后保存记录时用到（好像就没有其它作用了）【Initial staking index】
@@ -68,7 +69,7 @@ const intialBondDebt = '0'
 
 describe("===========================OlympusDao test===========================", function () {
     beforeEach(async function () {
-        [owner, presaleDaiReceiptor, daoUser, staker1, bonder1, user3, user4] = await ethers.getSigners();
+        [deployer, presaleDaiReceiptor, daoUser, staker1, bonder1, user3, user4] = await ethers.getSigners();
         defaultAndPrintParam();
     });
 
@@ -81,9 +82,18 @@ describe("===========================OlympusDao test==========================="
 
         //部署合约
         await deployContract();
-        //预售之前的一些初始配置
+        //合约部署后的初始配置
+        await initAfterDeploy();
+        //准备开启预售（生产中，如果OHM初始绑定的金额是自己出，则可以考虑不用私募，直接调treasury的deposit就可以）
         await initForPresale();
-        //预售完成之后，在项目正式启动前要初始化一些配置
+        //参与预售
+        await purchaseAOHM();
+        //项目方首次用存储(获取初始OHM)
+        await firstDepositForOHM();
+        //准备开启aOHM兑换OHM功能
+        await initForMigration();
+        //兑换，将aOHM兑换成OHM
+        await migration();
         // await initBeforeProjectRun();
         //债券测试
         // await bondTest();
@@ -97,7 +107,7 @@ describe("===========================OlympusDao test==========================="
         // //nft转让
         // await transferTest();
         // //合约拥有者提现
-        // await ownerWithdraw();
+        // await deployerWithdraw();
     });
 
 });
@@ -132,39 +142,93 @@ async function deployContract() {
  */
 async function initForPresale() {
     console.log(">>>>>> initForPresale start");
-    console.log("before initForPresale，aohmBalanceOfOwner:%s, aohmBalanceOfSaleContract:%s", ethers.utils.formatUnits(await deployedAlphaOHM.balanceOf(owner.address), ohmDecimal), ethers.utils.formatUnits(await deployedAlphaOHM.balanceOf(deployedOHMPresale.address), ohmDecimal));
+    //将staker1加入预售白名单
+    await deployedOHMPresale.connect(deployer).whiteListBuyers([staker1.address]);
+    console.log("before initForPresale，aohmBalanceOfDeployer:%s, aohmBalanceOfSaleContract:%s", ethers.utils.formatUnits(await deployedAlphaOHM.balanceOf(deployer.address), ohmDecimal), ethers.utils.formatUnits(await deployedAlphaOHM.balanceOf(deployedOHMPresale.address), ohmDecimal));
     await deployedOHMPresale.initialize(presaleDaiReceiptor.address, deployedDAI.address, deployedAlphaOHM.address, aOhmSalePrice, aOhmSaleLength);
-    await deployedAlphaOHM.connect(owner).transfer(deployedOHMPresale.address, await deployedAlphaOHM.balanceOf(owner.address));
-    console.log("after initForPresale，aohmBalanceOfOwner:%s, aohmBalanceOfSaleContract:%s", ethers.utils.formatUnits(await deployedAlphaOHM.balanceOf(owner.address), ohmDecimal), ethers.utils.formatUnits(await deployedAlphaOHM.balanceOf(deployedOHMPresale.address), ohmDecimal));
+    await deployedAlphaOHM.connect(deployer).transfer(deployedOHMPresale.address, await deployedAlphaOHM.balanceOf(deployer.address));
+    console.log("after initForPresale，aohmBalanceOfDeployer:%s, aohmBalanceOfSaleContract:%s", ethers.utils.formatUnits(await deployedAlphaOHM.balanceOf(deployer.address), ohmDecimal), ethers.utils.formatUnits(await deployedAlphaOHM.balanceOf(deployedOHMPresale.address), ohmDecimal));
     console.log(">>>>>> initForPresale fihish");
 }
 
 /**
- * 预售进行
+ * 预售期购买aOHM
  */
-async function presaleOHM() {
+async function purchaseAOHM() {
     console.log(">>>>>> presaleOHM start");
-
-    await deployedOHMPresale.initialize(presaleDaiReceiptor.address, deployedDAI.address, deployedAlphaOHM.address, aOhmSalePrice, aOhmSaleLength);
-    console.log(">>>>>> presaleOHM start");
+    //给staker1铸造dai
+    await deployedDAI.connect(deployer).mint(staker1.address, initialDaiMint);
+    console.log("mint dai to staker1,amount:%s", initialDaiMintStr);
+    //staker1用dai购买aOHM
+    await deployedDAI.connect(staker1).approve(deployedOHMPresale.address, daiApproveAmount);
+    await deployedOHMPresale.connect(staker1).purchaseaOHM(initialDaiMint);
+    //检查预售合约的dai份额
+    await deployedDAI.balanceOf(presaleDaiReceiptor.address).then(function (result) {
+        console.log("after presale, presaleDaiReceiptorBalanceOfDai:%s", ethers.utils.formatUnits(result, daiDecimal));
+        assert.equal(ethers.utils.formatUnits(result, daiDecimal), ethers.utils.formatUnits(initialDaiMint, daiDecimal));
+    });
+    //检查staker1的aOHM份额
+    await deployedAlphaOHM.balanceOf(staker1.address).then(function (result) {
+        console.log("after presale, staker1BalanceOfAohm:%s", ethers.utils.formatUnits(result, ohmDecimal));
+        let exceptAohmAmount = parseFloat(initialDaiMintStr) / parseFloat(aOhmSalePriceStr);
+        assert.equal(parseFloat(ethers.utils.formatUnits(result, ohmDecimal)), exceptAohmAmount);
+    });
+    console.log(">>>>>> presaleOHM finish");
 
 }
 
 /**
- * 兑换合约配置（aOHM兑换ohm）
+ * 首次存储DAI，获得项目初始OHM.
+ */
+async function firstDepositForOHM() {
+    console.log(">>>>>> firstDepositForOHM start");
+    let presaleDaiReceiptorOwnDaiAmount = await deployedDAI.balanceOf(presaleDaiReceiptor.address);
+    console.log("presaleDaiReceiptorOwnDaiAmount:%s", presaleDaiReceiptorOwnDaiAmount);
+    let depositDaiAmountStr = ethers.utils.formatUnits(presaleDaiReceiptorOwnDaiAmount, daiDecimal);
+    console.log("before deposit,presaleDaiReceiptorOwnDaiAmount:%s", presaleDaiReceiptorOwnDaiAmount);
+    await deployedDAI.connect(presaleDaiReceiptor).approve(deployedTreasury.address, daiApproveAmount);
+    //首次进DAI和出OHM的份额比已确定了他们的价格比。 分红收益的份额设置为0，因此 dai:ohm=1:1
+    await deployedTreasury.connect(presaleDaiReceiptor).deposit(presaleDaiReceiptorOwnDaiAmount, deployedDAI.address, 0);
+
+    //份额确认
+    let presaleDaiReceiptorOwnOhmAmount = await deployedOHM.balanceOf(presaleDaiReceiptor.address);
+    let expectPresaleDaiReceiptorOwnOhmAmount = ethers.utils.parseUnits(depositDaiAmountStr, ohmDecimal);
+    console.log("after deposit, expectPresaleDaiReceiptorOwnOhmAmount:%s presaleDaiReceiptorOwnOhmAmount:%s", expectPresaleDaiReceiptorOwnOhmAmount, presaleDaiReceiptorOwnOhmAmount);
+    assert.equal(parseFloat(ethers.utils.formatUnits(presaleDaiReceiptorOwnOhmAmount, ohmDecimal)), parseFloat(depositDaiAmountStr));
+    console.log(">>>>>> firstDepositForOHM finish");
+}
+
+
+/**
+ * 开启兑换功能（aOHM兑换OHM）
  */
 async function initForMigration() {
-
+    console.log(">>>>>> initForMigration start");
+    //将OHM转进兑换合约
+    let presaleDaiReceiptorOwnOhmAmount = await deployedOHM.balanceOf(presaleDaiReceiptor.address);
+    await deployedOHM.connect(presaleDaiReceiptor).transfer(deployedAohmMigration.address, presaleDaiReceiptorOwnOhmAmount);
+    //开启初始化兑换功能
+    await deployedAohmMigration.connect(deployer).initialize(deployedOHM.address, deployedAlphaOHM.address, aOHMDuration);
+    console.log(">>>>>> initForMigration finish");
 }
+
 
 /**
  * 兑换（aOHM兑换ohm）
  */
 async function migration() {
-    const aOhmSalePrice = ethers.utils.parseUnits('0.5', daiDecimal);  //预售期0.5个dai买一个aOHM
-    const aOhmSaleLength = 86400000;  //1天=86400000
-    const aOHMDuration = 10;//预售结束后，aohm兑换ohm的窗口开放时长（多少个区块）
+    let staker1OwnAohmAmount = await deployedAlphaOHM.balanceOf(staker1.address);
+    let staker1OwnOhmAmount = await deployedOHM.balanceOf(staker1.address);
+    console.log("befores migration, staker1OwnAohmAmount:%s staker1OwnOhmAmount:%s", staker1OwnAohmAmount, staker1OwnOhmAmount);
+    //兑换
+    await deployedAohmMigration.connect(staker1).migrate(staker1BalanceOfAohm);
 
+    //校验结果
+    staker1OwnAohmAmount = await deployedAlphaOHM.balanceOf(staker1.address);
+    staker1OwnOhmAmount = await deployedOHM.balanceOf(staker1.address);
+    console.log("after migration, staker1OwnAohmAmount:%s staker1OwnOhmAmount:%s", staker1OwnAohmAmount, staker1OwnOhmAmount);
+
+    assert.equal(parseFloat(ethers.utils.formatUnits(staker1OwnAohmAmount, ohmDecimal)), parseFloat(ethers.utils.formatUnits(staker1OwnOhmAmount, ohmDecimal)));
 }
 
 
@@ -184,6 +248,13 @@ async function initAfterDeploy() {
     //REWARDMANAGER: 8 - 允许铸造OHM给其它用户
     await deployedTreasury.queue('8', deployedDistributor.address);
     await deployedTreasury.toggle('8', deployedDistributor.address, zeroAddress);
+    // //RESERVETOKEN:2-允许成为合约支持的储备金  允许将dai作为国库的储备金  已经在构造函数中配置DAI作为储备金
+    // await deployedTreasury.queue('2', deployedDAI.address);
+    // await deployedTreasury.toggle('2', deployedDAI.address, zeroAddress);
+    //RESERVEDEPOSITOR:0-允许存入储备金   这是为了在firstDepositForOHM函数中，首次存入储备金
+    await deployedTreasury.queue('0', presaleDaiReceiptor.address);
+    await deployedTreasury.toggle('0', presaleDaiReceiptor.address, zeroAddress);
+
 
     //初始化sOHM的参数
     await deployedSOHM.initialize(deployedStaking.address);
@@ -204,10 +275,10 @@ async function initAfterDeploy() {
     // 配置债券信息（如：最低价、最大单笔交易等）
     await deployedDaiBond.initializeBondTerms(daiBondBCV, bondVestingLength, minBondPrice, maxBondPayout, bondFee, maxBondDebt, intialBondDebt);
 
-    // //测试将用户添加为REWARDMANAGER---允许给其它用户铸OHM的测试币（生产环境可以不给owner加这个权限）
+    // //测试将用户添加为REWARDMANAGER---允许给其它用户铸OHM的测试币（生产环境可以不给deployer加这个权限）
     // await expectRevert(deployedTreasury.mintRewards(staker1.address, initialOhmMint), "Not approved");
-    // await deployedTreasury.queue('8', owner.address);
-    // await deployedTreasury.toggle('8', owner.address, zeroAddress);
+    // await deployedTreasury.queue('8', deployer.address);
+    // await deployedTreasury.toggle('8', deployer.address, zeroAddress);
     // await deployedTreasury.mintRewards(staker1.address, initialOhmMint);
     // console.log("staker1 default ohmBalance:%s", ethers.utils.formatUint(await deployedOHM.balanceOf(staker1.address), ohmDecimal));
     // console.log("staker1 default sOhmBalance:%s", ethers.utils.formatUint(await deployedSOHM.balanceOf(staker1.address), ohmDecimal));
@@ -215,8 +286,8 @@ async function initAfterDeploy() {
     //专为测试的初始化
     //init for test
     //给测试用户mint一些DAI
-    await deployedDAI.mint(staker1.address, initialDaiMint);
-    console.log("bonder1 default daiBalance:%s", ethers.utils.formatUnits(await deployedDAI.balanceOf(bonder1.address), daiDecimal));
+    // await deployedDAI.mint(staker1.address, initialDaiMint);
+    // console.log("bonder1 default daiBalance:%s", ethers.utils.formatUnits(await deployedDAI.balanceOf(bonder1.address), daiDecimal));
 
     console.log("initAfterDeploy finish");
 }
@@ -270,11 +341,11 @@ async function defaultAndPrintParam() {
     console.log("bondFee: %s", bondFee);
     console.log("maxBondDebt: %s", maxBondDebt);
     console.log("intialBondDebt: %s", intialBondDebt);
-    console.log("deployerAddress: %s", deployerAddress);
-    console.log("mockDaoAddress: %s", mockDaoAddress);
+    console.log("deployerAddress: %s", deployer.address);
+    console.log("mockDaoAddress: %s", daoUser.address);
     console.log("initialIndex: %s", initialIndex);
     console.log("initialRewardRate: %s", initialRewardRate);
     console.log("zeroAddress: %s", zeroAddress);
-    console.log("largeApproval: %s", largeApproval);
-    console.log("initialMint: %s", initialMint);
+    console.log("daiApproveAmount: %s", daiApproveAmount);
+    console.log("initialDaiMint: %s", initialDaiMint);
 }
