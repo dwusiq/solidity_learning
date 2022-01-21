@@ -21,11 +21,11 @@ const daiApproveAmount = ethers.utils.parseUnits('100000000000000000000000000000
 // 初始mint多少ohm
 const ohmDecimal = 9;
 // const initialOhmMint = ethers.utils.parseUnits('100000', ohmDecimal);
-// const ohmApproveAmount = ethers.utils.parseUnits('10000000000000000', ohmDecimal);
+const ohmApproveAmount = ethers.utils.parseUnits('10000000000000000', ohmDecimal);
 
 
 //for preSale（生产根据实际填写）
-const aOhmSalePriceStr = "0.5";//预售期0.5个dai买一个aOHM
+const aOhmSalePriceStr = "1";//(注，如果价格改成小于1，则下面的预售相关的案例有部分要改动)预售期1个dai买一个aOHM（如果预售期ohm相对于dai的价格小于1，则项目方需要一半的钱买ohm给客户兑换，因为合约保证一个dai对应一个ohm）
 const aOhmSalePrice = ethers.utils.parseUnits(aOhmSalePriceStr, daiDecimal);  //预售期0.5个dai买一个aOHM
 const aOhmSaleLength = 30 * 86400000;  //1天=86400000
 const aOHMDuration = 100;//预售结束后，aohm兑换ohm的窗口开放时长（多少个区块）
@@ -187,14 +187,23 @@ async function firstDepositForOHM() {
     let depositDaiAmountStr = ethers.utils.formatUnits(presaleDaiReceiptorOwnDaiAmount, daiDecimal);
     console.log("before deposit,presaleDaiReceiptorOwnDaiAmount:%s", presaleDaiReceiptorOwnDaiAmount);
     await deployedDAI.connect(presaleDaiReceiptor).approve(deployedTreasury.address, daiApproveAmount);
-    //首次进DAI和出OHM的份额比已确定了他们的价格比。 分红收益的份额设置为0，因此 dai:ohm=1:1
-    await deployedTreasury.connect(presaleDaiReceiptor).deposit(presaleDaiReceiptorOwnDaiAmount, deployedDAI.address, 0);
+
+    //首次进DAI和出OHM的份额比已确定了他们的价格比(注意，如果有引入预售，需要结合预售的价格配置比例，如果这里投入的dai产出的OHM比预售的高，则会导致项目方自己垫钱)
+    // 计算存储的dai份额根据价格运算总应得多少OHM
+    let outOHMAmount = parseFloat(depositDaiAmountStr) / parseFloat(aOhmSalePriceStr);//计算dai对应的OHM产出
+    let outOHMAmountBitnumber = ethers.utils.parseUnits(outOHMAmount + "", ohmDecimal);
+    // 计算指定资产的份额价值多少OHM(无风险价值RFV)
+    let rfvValue = await deployedTreasury.valueOfToken(deployedDAI.address, presaleDaiReceiptorOwnDaiAmount);
+    //计算用于收益分红的份额
+    let profitAmount = rfvValue.sub(outOHMAmountBitnumber);
+    console.log("rfvValue:%s profitAmount:%s", rfvValue, profitAmount);
+    await deployedTreasury.connect(presaleDaiReceiptor).deposit(presaleDaiReceiptorOwnDaiAmount, deployedDAI.address, profitAmount);
 
     //份额确认
     let presaleDaiReceiptorOwnOhmAmount = await deployedOHM.balanceOf(presaleDaiReceiptor.address);
-    let expectPresaleDaiReceiptorOwnOhmAmount = ethers.utils.parseUnits(depositDaiAmountStr, ohmDecimal);
+    let expectPresaleDaiReceiptorOwnOhmAmount = ethers.utils.parseUnits(outOHMAmount + "", ohmDecimal);
     console.log("after deposit, expectPresaleDaiReceiptorOwnOhmAmount:%s presaleDaiReceiptorOwnOhmAmount:%s", expectPresaleDaiReceiptorOwnOhmAmount, presaleDaiReceiptorOwnOhmAmount);
-    assert.equal(parseFloat(ethers.utils.formatUnits(presaleDaiReceiptorOwnOhmAmount, ohmDecimal)), parseFloat(depositDaiAmountStr));
+    assert.equal(parseFloat(ethers.utils.formatUnits(presaleDaiReceiptorOwnOhmAmount, ohmDecimal)), outOHMAmount);
     console.log(">>>>>> firstDepositForOHM finish");
 }
 
@@ -207,6 +216,13 @@ async function initForMigration() {
     //将OHM转进兑换合约
     let presaleDaiReceiptorOwnOhmAmount = await deployedOHM.balanceOf(presaleDaiReceiptor.address);
     await deployedOHM.connect(presaleDaiReceiptor).transfer(deployedAohmMigration.address, presaleDaiReceiptorOwnOhmAmount);
+
+    //检查兑换合约的OHM份额
+    await deployedOHM.balanceOf(deployedAohmMigration.address).then(function (result) {
+        console.log("migrationOwnOhmAmount:%s", ethers.utils.formatUnits(result, ohmDecimal));
+        assert.equal(parseFloat(ethers.utils.formatUnits(result, ohmDecimal)), parseFloat(ethers.utils.formatUnits(presaleDaiReceiptorOwnOhmAmount, ohmDecimal)));
+    });
+
     //开启初始化兑换功能
     await deployedAohmMigration.connect(deployer).initialize(deployedOHM.address, deployedAlphaOHM.address, aOHMDuration);
     console.log(">>>>>> initForMigration finish");
@@ -217,18 +233,23 @@ async function initForMigration() {
  * 兑换（aOHM兑换ohm）
  */
 async function migration() {
-    let staker1OwnAohmAmount = await deployedAlphaOHM.balanceOf(staker1.address);
-    let staker1OwnOhmAmount = await deployedOHM.balanceOf(staker1.address);
-    console.log("befores migration, staker1OwnAohmAmount:%s staker1OwnOhmAmount:%s", staker1OwnAohmAmount, staker1OwnOhmAmount);
+    console.log(">>>>>> migration start");
+
+    let staker1OwnAohmAmountBefore = await deployedAlphaOHM.balanceOf(staker1.address);
+    let staker1OwnOhmAmountBefore = await deployedOHM.balanceOf(staker1.address);
+    console.log("befores migration, staker1OwnAohmAmountBefore:%s staker1OwnOhmAmountBefore:%s", staker1OwnAohmAmountBefore, staker1OwnOhmAmountBefore);
     //兑换
-    await deployedAohmMigration.connect(staker1).migrate(staker1BalanceOfAohm);
+    await deployedAlphaOHM.connect(staker1).approve(deployedAohmMigration.address, ohmApproveAmount);
+    await deployedAohmMigration.connect(staker1).migrate(staker1OwnAohmAmountBefore);
 
     //校验结果
-    staker1OwnAohmAmount = await deployedAlphaOHM.balanceOf(staker1.address);
-    staker1OwnOhmAmount = await deployedOHM.balanceOf(staker1.address);
-    console.log("after migration, staker1OwnAohmAmount:%s staker1OwnOhmAmount:%s", staker1OwnAohmAmount, staker1OwnOhmAmount);
+    staker1OwnAohmAmountAfterMigrate = await deployedAlphaOHM.balanceOf(staker1.address);
+    staker1OwnOhmAmountAfterMigrate = await deployedOHM.balanceOf(staker1.address);
+    console.log("after migration, staker1OwnAohmAmountAfterMigrate:%s staker1OwnOhmAmountAfterMigrate:%s", staker1OwnAohmAmountAfterMigrate, staker1OwnOhmAmountAfterMigrate);
 
-    assert.equal(parseFloat(ethers.utils.formatUnits(staker1OwnAohmAmount, ohmDecimal)), parseFloat(ethers.utils.formatUnits(staker1OwnOhmAmount, ohmDecimal)));
+    assert.equal(parseFloat(ethers.utils.formatUnits(staker1OwnAohmAmountBefore, ohmDecimal)), parseFloat(ethers.utils.formatUnits(staker1OwnOhmAmountAfterMigrate, ohmDecimal)));
+
+    console.log(">>>>>> migration finish");
 }
 
 

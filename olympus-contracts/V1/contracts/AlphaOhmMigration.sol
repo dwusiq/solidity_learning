@@ -6,6 +6,8 @@
 
 pragma solidity 0.7.5;
 
+import "@nomiclabs/buidler/console.sol";
+
 interface IOwnable {
     function owner() external view returns (address);
 
@@ -441,6 +443,11 @@ contract AohmMigration is Ownable {
             "amount above user balance"
         );
         require(block.number < swapEndBlock, "swapping of aOHM has ended");
+
+        console.log(">>> amount:%s",amount);
+        console.log(">> sender:%s",msg.sender);
+        console.log(">> senderOwn:%s",aOHM.balanceOf(msg.sender));
+        console.log(">> contractOwn:%s",OHM.balanceOf(address(this)));
 
         //将用户的aOHM转到当前合约
         aOHM.transferFrom(msg.sender, address(this), amount);

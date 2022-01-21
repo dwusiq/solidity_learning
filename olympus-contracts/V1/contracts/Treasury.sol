@@ -601,6 +601,7 @@ contract OlympusTreasury is Ownable {
     {
         if (isReserveToken[_token]) {
             // convert amount to match OHM decimals
+            //TODO 个人认为这里确保了dai和ohm的价值比例1:1
             value_ = _amount.mul(10**IERC20(OHM).decimals()).div(
                 10**IERC20(_token).decimals()
             );
