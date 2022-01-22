@@ -561,8 +561,6 @@ contract MockOlympusTreasury is Ownable {
         @return uint
      */
     function excessReserves() public view returns (uint256) {
-      console.log("totalReserves:%s",totalReserves);
-      console.log("IERC20(OHM).totalSupply():%s",IERC20(OHM).totalSupply());
         return totalReserves.sub(IERC20(OHM).totalSupply().sub(totalDebt));
     }
 

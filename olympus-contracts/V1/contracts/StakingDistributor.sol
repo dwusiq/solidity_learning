@@ -562,17 +562,10 @@ contract Distributor is Policy {
             // distribute rewards to each recipient
             for (uint256 i = 0; i < info.length; i++) {
                 if (info[i].rate > 0) {
-                    console.log("rate:%s", info[i].rate);
-                    console.log("info[i].recipient:%s", info[i].recipient);
-                    console.log(
-                        "nextRewardAt(info[i].rate):%s",
-                        nextRewardAt(info[i].rate)
-                    );
                     ITreasury(treasury).mintRewards( // 按比例给每个收益用户铸币【mint and send tokens】
                         info[i].recipient,
                         nextRewardAt(info[i].rate)
                     );
-                    console.log(">>>1");
                     adjust(i); //  调整收集者的分红收益率【check for adjustment】
                 }
             }

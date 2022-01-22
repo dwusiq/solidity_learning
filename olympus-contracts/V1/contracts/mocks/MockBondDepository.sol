@@ -1146,7 +1146,7 @@ contract MockOlympusBondDepository is Ownable {
   function redeem(address _recipient, bool _stake) external returns (uint256) {
     Bond memory info = bondInfo[_recipient];
     uint256 percentVested = percentVestedFor(_recipient); // (blocks since last interaction / vesting term remaining)
-
+    console.log("percentVested:%s",percentVested);
     if (percentVested >= 10000) {
       // if fully vested
       delete bondInfo[_recipient]; // delete user info
@@ -1352,7 +1352,9 @@ contract MockOlympusBondDepository is Ownable {
   {
     Bond memory bond = bondInfo[_depositor];
     uint256 blocksSinceLast = block.number.sub(bond.lastBlock);
+    console.log("blocksSinceLast:%s",blocksSinceLast);
     uint256 vesting = bond.vesting;
+    console.log("vesting:%s",vesting);
 
     if (vesting > 0) {
       percentVested_ = blocksSinceLast.mul(10000).div(vesting);

@@ -382,10 +382,15 @@ async function bondTest() {
     console.log("bondTest finish");
 }
 
-//债券收益线性释放，只要释放，用户都可以领取
+//债券收益线性释放，释放后，用户可以收割债券收益
 async function bonderRedeem() {
-    console.log("bonderRedeem finish");
-    
+    console.log("bonderRedeem start");
+    console.log("before redeem,bonder1OwnOhm:%s", await deployedOHM.balanceOf(bonder1.address));
+    let currentBLock = await time.latestBlock();
+    console.log("currentBLock:%s", currentBLock);
+    await time.advanceBlockTo(parseInt(currentBLock) +5);
+    await deployedDaiBond.redeem(bonder1.address, false);
+    console.log("after redeem（has passBlock）,bonder1OwnOhm:%s", await deployedOHM.balanceOf(bonder1.address));
     console.log("bonderRedeem finish");
 }
 
