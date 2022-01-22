@@ -698,7 +698,7 @@ contract OlympusStaking is Ownable {
   uint256 public totalBonus;
 
   address public warmupContract; //
-  uint256 public warmupPeriod;
+  uint256 public warmupPeriod;   //默认没有热身期
 
   constructor(
     address _OHM,

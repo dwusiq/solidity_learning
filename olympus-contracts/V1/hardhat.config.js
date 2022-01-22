@@ -13,7 +13,7 @@ const KOVAN_OWNER_KEY = '5511a7aeb49a387168e4cc16a815f7b641d5fa4afe442a2dede5639
 const config = {
   networks: {
     hardhat: {
-      allowUnlimitedContractSize: false,
+      allowUnlimitedContractSize: true, //不限制合约大小
     },
     kovan: {
       url: `https://kovan.infura.io/v3/0bf59832a3d74ade9625a218acdbecb3`,

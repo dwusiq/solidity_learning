@@ -935,7 +935,7 @@ contract OlympusBondDepository is Ownable {
         uint256 controlVariable; //  价格缩放变量--会自动变化，而且会影响价格的波动【scaling variable for price】
         uint256 vestingTerm; // 用户购买债券需要锁定的期限（OlympusDao在以太坊主网是33110个块，约5天）【in blocks】
         uint256 minimumPrice; // 债券最低价格【vs principle value】
-        uint256 maxPayout; // 用户购买债券时，合约单笔最大支付的OHM份额【in thousandths of a %. i.e. 500 = 0.5%】
+        uint256 maxPayout; // 用户购买债券时，合约单笔最大支付占当前OHM总供应的比例（n/100000）【in thousandths of a %. i.e. 500 = 0.5%】
         uint256 fee; // 购买债券收取的手续费【as % of bond payout, in hundreths. ( 500 = 5% = 0.05 for every 1 paid)】
         uint256 maxDebt; // 本次债券周期允许所有用户同时持有的债券总额最大值【9 decimal debt ratio, max % total supply created as debt】
     }
