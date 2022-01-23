@@ -11,15 +11,25 @@
 * bonding(债券)：用户用合约指定的币种(或LP)来购买`OHM`,这样用户得到`OHM`,并且用户支付的资产将归属于合约。
 * selling(出售)：用户出售自己手中的OHM获利。
 
-## 二、合约测试
-* 依赖安装
-```
-npm install
-```
+## 二、合约理解
+#### 不同合约在不同时期的币种变化
+* `staking`
+  - `stake`: 进`OHM`,触发`distribute`函数向`treasury`申请给`staking`合约铸造`OHM`
+  - `claim`: 调用`warmupContract`给`recipient`发`sOHM`
+* `warmupContract`
+  - `stake`: 进`sOHM`
+* `treasury`
+  - `deposit`:  铸造除了分红之外的`OHM`给`sender`(项目方或者`bondDepository`合约)
+  - `withdraw`:
+* `bondDepository`
+  - `deposit`:  先将`reserveToken`转到本合约再转给`treasury`合约。将手续费`OHM`给`dao`地址
+  - `redeem`: 将`OHM`转给`recipient`地址或`staking`合约或`stakingHelper`合约
+
 
 ## 六、合约理解的关键点
 
 * `sOHM`合约的关注点：
+  
   - 协议内计算份额是用`gon`,但协议外从用户的角度都是取`sOHM`的份额（即：`sOHM`对外，gon对内）
   - `sOHM`份额=`gon`份额/`_gonsPerFragment`，其中`_gonsPerFragment`跟`_totalSupply`成反比，`_gonsPerFragment`表示每单位`sOHM`价值多少`gon`
   - 每次调用`rebase`函数都会执行`_gonsPerFragment = TOTAL_GONS.div(_totalSupply);`,由`balanceOf`接口得知，则用户持有相同`gon`的前提下，`_gonsPerFragment`越小，则`sOHM`值越大
