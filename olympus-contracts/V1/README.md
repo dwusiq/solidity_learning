@@ -13,6 +13,28 @@
 
 ## 二、合约理解
 #### 不同合约在不同时期的币种变化
+* `stake`（质押`OHM`）
+  -  `sOHM.rebase()` -> `sOHM`的`_totalSupply`增加  ->  `_gonsPerFragment`减小  ->  每份`gon`折算的`sOHM`越多
+  - `distributor.distribute()` -> 确定下次分红的块高 -> 给`staking`合约在内的地址铸造`OHM`,份额为`IERC20(OHM).totalSupply().mul(_rate).div(1000000)`
+  - 计算下次分红的`OHM`份额
+  - 将用户的`OHM`份额转到当前合约 -> 累加该用户质押的`OHM`份额和待释放`gon`份额 -> 将本次质押`OHM`对应的`sOHM`份额转到`StakingWarmup`合约
+* `claim`(提取质押的收益`sOHM`)
+  - 判断最后一次质押时所在的周期是否已结束 -> 移除质押记录 -> `StakingWarmup.retrieve()` ->  从`StakingWarmup`将应得的`sOHM`转给收益地址。
+* `forfeit`(放弃收益，直接提取自己的所有`OHM`)
+  - 移除质押记录 -> `StakingWarmup.retrieve()` ->  从`StakingWarmup`将应得的`sOHM`转给`staking`合约。
+  - 将用户质押的`OHM`返还给用户
+* `unstake`(用`sOHM`兑换`OHM`)
+  - 用户可以自行选择要不要调用`rebase()`
+  - 将用户指定的`sOHM`份额转到`staking`合约
+  - 将`sOHM`对应的`OHM`份额转给用户
+* a、
+* a
+* a
+* a
+* a
+* a
+* a
+* a
 * `staking`
   - `stake`: 进`OHM`,触发`distribute`函数向`treasury`申请给`staking`合约铸造`OHM`
   - `claim`: 调用`warmupContract`给`recipient`发`sOHM`
