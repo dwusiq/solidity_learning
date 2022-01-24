@@ -1127,6 +1127,7 @@ contract OlympusBondDepository is Ownable {
 
         // 扣除手续费后的收益【profits are calculated】
         uint256 fee = payout.mul(terms.fee).div(10000);
+        //计算用于rebase分红的`OHM`份额， 分红份额=存入资产总价值-需要支付给用户的份额-手续费
         uint256 profit = value.sub(payout).sub(fee);
 
         /**
@@ -1136,7 +1137,7 @@ contract OlympusBondDepository is Ownable {
          */
         //将用户的资产转到当前合约
         IERC20(principle).safeTransferFrom(msg.sender, address(this), _amount);
-        //将这笔资产转存到treasury合约，然后treasury会给当前合约mint这笔交易的手续费(fee)
+        //将这笔资产转存到treasury合约，然后treasury会给当前合约mint这笔交易需要支付给用户的费用和手续费(fee)
         IERC20(principle).approve(address(treasury), _amount);
         ITreasury(treasury).deposit(_amount, principle, profit);
 

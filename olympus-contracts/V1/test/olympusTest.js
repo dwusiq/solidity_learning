@@ -88,7 +88,7 @@ describe("===========================OlympusDao test==========================="
         await initForPresale();
         //参与预售
         await purchaseAOHM();
-        //项目方首次用存储(获取初始OHM)
+        //项目方首次存储储备金(获取初始OHM，和提供多余的储备金用于质押分红)
         await firstDepositForOHM();
         //准备开启aOHM兑换OHM功能
         await initForMigration();
@@ -189,7 +189,7 @@ async function firstDepositForOHM() {
     let outOHMAmountBitnumber = ethers.utils.parseUnits(outOHMAmount + "", ohmDecimal);
     // 计算指定资产的份额价值多少OHM(无风险价值RFV)
     let rfvValue = await deployedTreasury.valueOfToken(deployedDAI.address, presaleDaiReceiptorOwnDaiAmount);
-    //计算用于收益分红的份额（如果分红份额是0，则后续不能质押ohm,因为没有多余的dai储备金）
+    //计算留在`Treasury`作为多余的储备金（如果分红份额是0，则后续不能质押ohm,因为没有多余的dai储备金）
     let profitAmount = rfvValue.sub(outOHMAmountBitnumber);
     console.log("rfvValue:%s profitAmount:%s", rfvValue, profitAmount);
     await deployedTreasury.connect(presaleDaiReceiptor).deposit(presaleDaiReceiptorOwnDaiAmount, deployedDAI.address, profitAmount);

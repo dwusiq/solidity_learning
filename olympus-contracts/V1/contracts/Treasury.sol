@@ -402,7 +402,7 @@ contract OlympusTreasury is Ownable {
         @notice 允许授权地址存储指定资产来获取OHM【allow approved address to deposit an asset for OHM】
         @param _amount uint    //质押资产的份额（资产份额）
         @param _token address  //质押资产的地址
-        @param _profit uint    //实际质押者应得收益（OHM份额）
+        @param _profit uint    //这个份额留在Treasury合约用作多余的储备金（如果Treasury合约没有多余的储备金，则不能质押ohm,因为触发rebase会调用mintRewards函数，该函数要求每个新铸造的OHM要有储备金支撑）
         @return send_ uint
      */
     function deposit(
@@ -423,9 +423,9 @@ contract OlympusTreasury is Ownable {
             require(isLiquidityDepositor[msg.sender], "Not approved");
         }
 
-        //计算指定资产的份额价值多少OHM
+        //计算指定资产的份额价值多少OHM(无风险价值)
         uint256 value = valueOf(_token, _amount);
-        // 给请求者的份额(其实就是最终给dao的fee)=存入资产总价值-实际用户赢得份额【mint OHM needed and store amount of rewards for distribution】
+        // 给请求者的份额(即给用户的支付份额+手续费份额))=存入资产总价值-给rebase分红的份额【mint OHM needed and store amount of rewards for distribution】
         send_ = value.sub(_profit);
         IERC20Mintable(OHM).mint(msg.sender, send_);
         //总储备金增加
@@ -436,9 +436,9 @@ contract OlympusTreasury is Ownable {
     }
 
     /**
-        @notice 用户用OHM兑换储备中的指定资产(会销毁OHM)【allow approved address to burn OHM for reserves】
-        @param _amount uint
-        @param _token address
+        @notice 有权限的用户用OHM兑换储备中的指定资产(会销毁OHM)【allow approved address to burn OHM for reserves】
+        @param _amount uint  计划获取的目标token份额
+        @param _token address  计划获取的目标token地址
      */
     function withdraw(uint256 _amount, address _token) external {
         require(isReserveToken[_token], "Not accepted"); // Only reserves can be used for redemptions
