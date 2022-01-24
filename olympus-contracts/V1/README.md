@@ -17,7 +17,7 @@
 > 质押`OHM`赚取分红
 
 * `stake`（质押`OHM`）
-  -  `sOHM.rebase()` -> `sOHM`的`_totalSupply`增加  ->  `_gonsPerFragment`减小  ->  每份`gon`折算的`sOHM`越多
+  -  `sOHM.rebase()` -> `sOHM`的`_totalSupply`增加  ->  `_gonsPerFragment`减小  ->  每份`gon`折算的`sOHM`增多
   - `distributor.distribute()` -> 确定下次分红的块高 -> 给`staking`合约在内的地址铸造`OHM`,份额为`IERC20(OHM).totalSupply().mul(_rate).div(1000000)`，但是要依赖`Treasury`合约存在多余的储备金，否则报错。
   - 计算下次分红的`OHM`份额
   - 将用户的`OHM`份额转到当前合约 -> 累加该用户质押的`OHM`份额和待释放`gon`份额 -> 将本次质押`OHM`对应的`sOHM`份额转到`StakingWarmup`合约
@@ -28,11 +28,11 @@
   - 将用户质押的`OHM`返还给用户
 * `unstake`(用`sOHM`兑换`OHM`)
   - 用户可以自行选择要不要触发`rebase()`
-  - 将用户指定的`sOHM`份额转到`staking`合约
-  - 将`sOHM`对应的`OHM`份额转给用户
+  - 从用户账户转`sOHM`到`staking`合约
+  - 从`staking`合约将`sOHM`对应的`OHM`份额转给用户
   
 ##### `BondDepository`合约
-> 以债券的形式用合约支持的`Token`折扣价购买`OHM`
+> 以债券的形式用`Token`折扣价购买`OHM`
 
 * `deposit`(折扣价购买`OHM`)
   - 分别计算：用于`rebase`分红份额、该购买者应付报酬份额、手续费份额
@@ -49,19 +49,29 @@
 * `withdraw`(被授权的地址销毁`OHM`得到`DAI`)
   - 计算销毁的`OHM`份额 -> 销毁`OHM` -> 将储备金的`Token`转给用户
 
-## 六、合约理解的关键点
+## 三、合约理解的关键点
 
 * `sOHM`合约的关注点：
   
   - 协议内计算份额是用`gon`,但协议外从用户的角度都是取`sOHM`的份额（即：`sOHM`对外，gon对内）
   - `sOHM`份额=`gon`份额/`_gonsPerFragment`，其中`_gonsPerFragment`跟`_totalSupply`成反比，`_gonsPerFragment`表示每单位`sOHM`价值多少`gon`
   - 每次调用`rebase`函数都会执行`_gonsPerFragment = TOTAL_GONS.div(_totalSupply);`,由`balanceOf`接口得知，则用户持有相同`gon`的前提下，`_gonsPerFragment`越小，则`sOHM`值越大
+  
 * `distributor`合约的关注点（这个合约解决了分红`OHM`的来源）
   
   - 这个合约配置在每个周期(`epoch`)给`staking`合约铸造多少`OHM`，这些`OHM`份额就是`staker`的收益来源
   - `await deployedDistributor.addRecipient(stakingAddress, initialRewardRate)`就是配置每周期的分红总额
   - 每次`staking`合约触发`rebase`都会调用`IDistributor(distributor).distribute()`产出用于分红的`OHM`
   - 因此每个周期都会有新的`OHM`产生
+  
 * 最开始的`OHM`来源
   
-    
+
+## 四、环境部署关注点
+##### `staking`合约
+* `_epochLength`: 每经过多少区块`rebase`一次，值跟`distributor`合约保持一致。
+* `_firstEpochNumber`: 首个`epoch`周期起始区块。
+* `_firstEpochBlock`：首个`epoch`周期结束区块。
+ 
+##### `StakingDistributor`合约
+* `_rewardRate`： 

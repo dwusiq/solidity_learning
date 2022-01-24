@@ -1275,7 +1275,7 @@ contract sOlympus is ERC20Permit, Ownable {
   }
 
   /**
-   *  @notice 变基，总的分为以下几个步骤：【increases sOHM supply to increase staking balances relative to profit_】
+   *  @notice 变基，使staking合约中OHM与sOHM的份额相等【increases sOHM supply to increase staking balances relative to profit_】
    *  @param profit_ uint256
    *  @return uint256
    */

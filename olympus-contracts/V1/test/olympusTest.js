@@ -27,19 +27,19 @@ const ohmApproveAmount = ethers.utils.parseUnits('10000000000000000', ohmDecimal
 //for preSale（生产根据实际填写）
 const aOhmSalePriceStr = "1";//(注，如果价格改成小于1，则下面的预售相关的案例有部分要改动)预售期1个dai买一个aOHM（如果预售期ohm相对于dai的价格小于1，则项目方需要一半的钱买ohm给客户兑换，因为合约保证一个dai对应一个ohm）
 const aOhmSalePrice = ethers.utils.parseUnits(aOhmSalePriceStr, daiDecimal);  //预售期0.5个dai买一个aOHM
-const aOhmSaleLength = 30 * 86400000;  //1天=86400000
+const aOhmSaleLength = 30 * 86400000;  //毫秒  1天=86400000
 const aOHMDuration = 100;//预售结束后，aohm兑换ohm的窗口开放时长（多少个区块）
 
 //for staking
-// 用于计算index的参数，每次rebase结束之后保存记录时用到（好像就没有其它作用了）【Initial staking index】
-const initialIndex = '7675210820';
+// 用于计算index的参数，每次rebase结束之后保存记录时用到，用户可以用来计算收益增长率（好像就没有其它作用了）【Initial staking index】
+const initialIndex = '0';
 //每个周期(Epoch)包含多少个区块（经过多少区块rebase一次）【 How many blocks are in each epoch】
 const epochLengthInBlocks = '20';
 // 首个周期(Epoch)的起始区块，如果为空则取当前区块【What epoch will be first epoch】
 let firstEpochNumber = '';
 //首个周期(Epoch)的结束区块,如果为空，则默认开始块+每个周期（epoch）的区块数（如果设置了首个结束区块，则首个epoch的结束区块不受epochLengthInBlocks影响）
 let firstEpochBlock = '';
-// TODO 不知道有什么用，这里跟官方脚本一样，设置为0
+// 变更权限的请求添加到队列后，多久可以实施切换，这里跟官方脚本一样，设置为0，即马上可以，影响不大
 let blocksNeededForQueue = 0;
 // 初始收益比例（影响到OHM产量）【Initial reward rate for epoch】
 // 每次rebase给staking合约mint的用于staker分红的OHM份额：IERC20(OHM).totalSupply().mul(_rate).div(1000000)
@@ -99,6 +99,10 @@ describe("===========================OlympusDao test==========================="
         await bondTest();
         //债券线性释放,用户可以提取自己的收益
         await bonderRedeem();
+        //测试质押
+        await stakingTest();
+        //收割质押收益
+        await claimStakingRewardTest();
         //测试质押
         await stakingTest();
         //收割质押收益
@@ -388,7 +392,7 @@ async function bonderRedeem() {
     console.log("before redeem,bonder1OwnOhm:%s", await deployedOHM.balanceOf(bonder1.address));
     let currentBLock = await time.latestBlock();
     console.log("currentBLock:%s", currentBLock);
-    await time.advanceBlockTo(parseInt(currentBLock) +5);
+    await time.advanceBlockTo(parseInt(currentBLock) + 5);
     await deployedDaiBond.redeem(bonder1.address, false);
     console.log("after redeem（has passBlock）,bonder1OwnOhm:%s", await deployedOHM.balanceOf(bonder1.address));
     console.log("bonderRedeem finish");

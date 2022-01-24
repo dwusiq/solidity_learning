@@ -558,9 +558,14 @@ contract Distributor is Policy {
     function distribute() external returns (bool) {
         if (nextEpochBlock <= block.number) {
             nextEpochBlock = nextEpochBlock.add(epochLength); // set next epoch block
-            console.log("nextEpochBlock:%s", nextEpochBlock);
+         
             // distribute rewards to each recipient
             for (uint256 i = 0; i < info.length; i++) {
+            console.log("nextEpochBlock:%s", nextEpochBlock);
+            console.log("IERC20(OHM).totalSupply():%s", IERC20(OHM).totalSupply());
+            console.log("rate:%s", info[i].rate);
+            console.log("nextRewardAt(info[i].rate):%s", nextRewardAt(info[i].rate));
+
                 if (info[i].rate > 0) {
                     ITreasury(treasury).mintRewards( // 按比例给每个收益用户铸币【mint and send tokens】
                         info[i].recipient,

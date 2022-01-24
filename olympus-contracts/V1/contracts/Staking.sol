@@ -734,6 +734,7 @@ contract OlympusStaking is Ownable {
         @return bool
      */
   function stake(uint256 _amount, address _recipient) external returns (bool) {
+    //协议要保证OHM与sOHM的比例是1:1,
     rebase();
     //将用户的OHM转入当前合约
     IERC20(OHM).safeTransferFrom(msg.sender, address(this), _amount);
@@ -826,7 +827,7 @@ contract OlympusStaking is Ownable {
       epoch.endBlock = epoch.endBlock.add(epoch.length);
       epoch.number++;
 
-      //分配分红（按OHM）,给分红地址铸造OHM
+      //分配分红（按OHM）,给分红地址铸造OHM(实际是当前的staking合约)
       if (distributor != address(0)) {
         IDistributor(distributor).distribute();
       }
