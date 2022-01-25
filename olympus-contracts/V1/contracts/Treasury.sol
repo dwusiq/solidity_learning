@@ -590,8 +590,8 @@ contract OlympusTreasury is Ownable {
 
     /**
         @notice 计算指定资产的份额价值多少OHM(无风险价值RFV)【returns OHM valuation of asset】
-        @param _token address
-        @param _amount uint
+        @param _token address  指定资产地址
+        @param _amount uint   指定资产的份额
         @return value_ uint
      */
     function valueOf(address _token, uint256 _amount)
@@ -601,7 +601,8 @@ contract OlympusTreasury is Ownable {
     {
         if (isReserveToken[_token]) {
             // convert amount to match OHM decimals
-            //TODO 个人认为这里确保了dai和ohm的价值比例1:1
+            //1单位OHM字面数值/1单位目标token字面数值 = OHM精度/指定token精度 = 10**IERC20(OHM).decimals()/10**IERC20(_token).decimals()
+            //例如，OHM精度9，DAI精度18，则1单位OHM字面数值/1单位Dai字面数值=1e9/1e18=1/1e9, 如果DAI的amount是10*1e18,则相对应OHM的份额=10*1e18 * 1/1e9=10*1e9;
             value_ = _amount.mul(10**IERC20(OHM).decimals()).div(
                 10**IERC20(_token).decimals()
             );

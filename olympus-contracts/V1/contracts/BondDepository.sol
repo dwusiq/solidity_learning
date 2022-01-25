@@ -826,6 +826,7 @@ library FixedPoint {
         return uint256(self._x) / 5192296858534827;
     }
 
+    //fraction函数，用来在两个uint112相除时提高精度，将分子左移112位，那么结果的左边112位就是值，右边的112位相当于小数位。用于UniswapV2的价格计算当中
     function fraction(uint256 numerator, uint256 denominator)
         internal
         pure
@@ -925,7 +926,7 @@ contract OlympusBondDepository is Ownable {
 
     mapping(address => Bond) public bondInfo; // 用户购买的债券的数据【stores bond information for depositors】
 
-    uint256 public totalDebt; // 当前所有用户持有的总债券【total value of outstanding bonds; used for pricing】
+    uint256 public totalDebt; // 当前需要合约支付的债券总额（单位是OHM）【total value of outstanding bonds; used for pricing】
     uint256 public lastDecay; // 上次用户持有总债券衰减时的区块【reference block for debt decay】
 
     /* ======== STRUCTS ======== */
@@ -1111,7 +1112,7 @@ contract OlympusBondDepository is Ownable {
         require(totalDebt <= terms.maxDebt, "Max capacity reached");
 
         uint256 priceInUSD = bondPriceInUSD(); // Stored in bond info
-        uint256 nativePrice = _bondPrice();
+        uint256 nativePrice = _bondPrice(); //执行价格
 
         require(
             _maxPrice >= nativePrice,
@@ -1120,6 +1121,7 @@ contract OlympusBondDepository is Ownable {
         //计算指定资产的份额价值多少OHM(无风险价值)
         uint256 value = ITreasury(treasury).valueOf(principle, _amount);
         //判断买入的这些份额，协议会给他多少回报(OHM)【payout to bonder is computed】
+        //支付给用户的报酬=支付资产的无风险价值/价格
         uint256 payout = payoutFor(value);
 
         require(payout >= 10000000, "Bond too small"); // must be > 0.01 OHM ( underflow protection )
@@ -1300,12 +1302,14 @@ contract OlympusBondDepository is Ownable {
     }
 
     /**
-     *  @notice 计算债券当前价格（溢价）【calculate current bond premium】
+     *  @notice 计算债券当前价格【calculate current bond premium】
      *  @return price_ uint
      */
     function bondPrice() public view returns (uint256 price_) {
-        //溢价（Premium） = 1 + (Debt Ratio * BCV)
-         //加1，所以溢价最终>=1
+        //溢价（Premium） = Debt Ratio * BCV
+        //价格=溢价+1=（Debt Ratio * BCV）+1
+        //加1，所以价格最终>=1
+        //当债券比率是0时（即没有待合约支付的债券），返回价格=1000000000/1e7=100
         price_ = terms.controlVariable.mul(debtRatio()).add(1000000000).div(
             1e7
         );
@@ -1319,6 +1323,7 @@ contract OlympusBondDepository is Ownable {
      *  @return price_ uint
      */
     function _bondPrice() internal returns (uint256 price_) {
+        //最低价格=0+1000000000/10e7=100
         price_ = terms.controlVariable.mul(debtRatio()).add(1000000000).div(
             1e7
         );

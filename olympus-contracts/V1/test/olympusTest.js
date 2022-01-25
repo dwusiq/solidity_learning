@@ -25,7 +25,7 @@ const ohmApproveAmount = ethers.utils.parseUnits('10000000000000000', ohmDecimal
 
 
 //for preSale（生产根据实际填写）
-const aOhmSalePriceStr = "1";//(注，如果价格改成小于1，则下面的预售相关的案例有部分要改动)预售期1个dai买一个aOHM（如果预售期ohm相对于dai的价格小于1，则项目方需要一半的钱买ohm给客户兑换，因为合约保证一个dai对应一个ohm）
+const aOhmSalePriceStr = "25";//预售期25个dai买一个aOHM(注，如果价格改成小于1，则下面的预售相关的案例有部分要改动)（如果预售期ohm相对于dai的价格小于1，则项目方需要一半的钱买ohm给客户兑换，因为合约保证一个dai对应一个ohm）
 const aOhmSalePrice = ethers.utils.parseUnits(aOhmSalePriceStr, daiDecimal);  //预售期0.5个dai买一个aOHM
 const aOhmSaleLength = 30 * 86400000;  //毫秒  1天=86400000
 const aOHMDuration = 100;//预售结束后，aohm兑换ohm的窗口开放时长（多少个区块）
@@ -43,24 +43,26 @@ let firstEpochBlock = '';
 let blocksNeededForQueue = 0;
 // 初始收益比例（影响到OHM产量）【Initial reward rate for epoch】
 // 每次rebase给staking合约mint的用于staker分红的OHM份额：IERC20(OHM).totalSupply().mul(_rate).div(1000000)
+//奖励比率是于每次的变基 (rebase) 时分配给每个质押者相对于总供应量的配置百分比。奖励比率由政策团队进行精确设定。
 const initialRewardRate = '3000';
 // 常量【Ethereum 0 address, used when toggling changes in treasury】
 const zeroAddress = '0x0000000000000000000000000000000000000000';
 
 //for bond
 // DAI购买债券的BCV【DAI bond BCV】
-const daiBondBCV = '369';
+const daiBondBCV = '650';
 // Frax购买债券的BCV【Frax bond BCV】
 const fraxBondBCV = '690';
 // 用户购买债券的锁仓时长---这是以太坊的时长，其它的需要按实际设置【Bond vesting length in blocks. 33110 ~ 5 days】
 const bondVestingLength = '33110';
 // 债券最低价【Min bond price】
-const minBondPrice = '50000';
-// 债券每笔交易的最大支出【Max bond payout】
-const maxBondPayout = '50'
-// 债券交易中dao手续费【DAO fee for bond(500 = 5% = 0.05 for every 1 paid)】
-const bondFee = '10000';
-// 最多能被持有多少债券【Max debt bond can take on】
+// 用户购买债券收获到的OHM份额=无风险价值/价格=支付的资产份额折算回OHM的份额/价格
+const minBondPrice = '0';
+// 债券每笔交易的最大支出比率（IERC20(OHM).totalSupply().mul(terms.maxPayout).div(100000);）【Max bond payout】
+const maxBondPayout = '5000'
+// 债券交易中dao手续费比率（fee = payout.mul(terms.fee).div(10000)）【DAO fee for bond(500 = 5% = 0.05 for every 1 paid)】
+const bondFee = '500';
+// 合约待支付债券份额不得超出该值【Max debt bond can take on】
 const maxBondDebt = '1000000000000000';
 // 初始债券数【Initial Bond debt】
 const intialBondDebt = '0'
@@ -99,10 +101,6 @@ describe("===========================OlympusDao test==========================="
         await bondTest();
         //债券线性释放,用户可以提取自己的收益
         await bonderRedeem();
-        //测试质押
-        await stakingTest();
-        //收割质押收益
-        await claimStakingRewardTest();
         //测试质押
         await stakingTest();
         //收割质押收益
@@ -177,7 +175,7 @@ async function purchaseAOHM() {
 }
 
 /**
- * 首次存储DAI，获得项目初始OHM.
+ * 首次存储DAI获得项目初始OHM.
  */
 async function firstDepositForOHM() {
     console.log(">>>>>> firstDepositForOHM start");
@@ -364,6 +362,9 @@ async function claimStakingRewardTest() {
     console.log(">>>>>> claimStakingRewardTest finish");
 }
 
+/**
+ * 测试购买债券（注意，当目前合约待支付债券份额为0时，价格好像不起效果，理想是支付的份额=购买的份额/债券价格，实际效果是支付的份额=购买的份额）
+ */
 async function bondTest() {
     console.log("bondTest start");
 
@@ -375,8 +376,19 @@ async function bondTest() {
 
     //购买债券
     await deployedDAI.connect(bonder1).approve(deployedDaiBond.address, initialDaiMint);
-    for (let i = 0; i < 20; i++) {
-        await deployedDaiBond.connect(bonder1).deposit(initialDaiMint.div(20), bondPrice, bonder1.address);
+
+    let totalBuyAmount = initialDaiMint;
+    while (totalBuyAmount > 0) {
+        //查询当前合约最大单笔支付份额（OHM）
+        let maxPayout = await deployedDaiBond.maxPayout();
+        //查询当前OHM价格（用户需要支付多少）
+        let price = await deployedDaiBond.bondPrice();
+        //计算购买的最大份额
+        let maxBuyAmount = maxPayout * price;
+        console.log("maxPayout:%s price:%s maxBuyAmount:%s", maxPayout, price, maxBuyAmount);
+        await deployedDaiBond.connect(bonder1).deposit(maxBuyAmount, bondPrice, bonder1.address);
+        await time.advanceBlockTo(parseInt(await time.latestBlock()) + 1);
+        totalBuyAmount = totalBuyAmount.sub(maxBuyAmount);
     }
     //查询债券信息
     let bonder1BondInfo = await deployedDaiBond.bondInfo(bonder1.address);

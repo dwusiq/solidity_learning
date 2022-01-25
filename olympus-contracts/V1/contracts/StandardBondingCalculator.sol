@@ -287,7 +287,8 @@ contract OlympusBondingCalculator is IBondingCalculator {
     }
 
     //计算某个LP的指定份额价值多少OHM(无风险价值RFV)
-    //LP/TotalLp = 购买债券花费的LP份额/该LP当前总供应量  =FixedPoint.fraction( amount_, totalSupply ).decode112with18() 
+    //LP/TotalLp = 购买债券花费的LP份额/该LP当前总供应量  =FixedPoint.fraction( amount_, totalSupply ).decode112with18()
+    //fraction函数，用来在两个uint112相除时提高精度，将分子左移112位，那么结果的左边112位就是值，右边的112位相当于小数位。用于UniswapV2的价格计算当中 
     function valuation( address _pair, uint amount_ ) external view override returns ( uint _value ) {
         uint totalValue = getTotalValue( _pair );
         uint totalSupply = IUniswapV2Pair( _pair ).totalSupply();

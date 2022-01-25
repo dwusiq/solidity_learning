@@ -522,7 +522,7 @@ contract Distributor is Policy {
     /* ====== STRUCTS ====== */
     //有分红的用户地址
     struct Info {
-        uint256 rate; // 分红占比【in ten-thousandths ( 5000 = 0.5% )】
+        uint256 rate; // 奖励比率是于每次的变基 (rebase) 时分配给每个质押者相对于总供应量的配置百分比。奖励比率由政策团队进行精确设定。【in ten-thousandths ( 5000 = 0.5% )】
         address recipient; //分红接收地址
     }
     Info[] public info;
