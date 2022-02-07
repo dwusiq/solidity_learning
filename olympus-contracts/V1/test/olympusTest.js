@@ -66,7 +66,7 @@ const minBondPrice = '5000';
 const maxBondPayout = '5000'
 // 债券交易中dao手续费比率（fee = payout.mul(terms.fee).div(10000)）【DAO fee for bond(500 = 5% = 0.05 for every 1 paid)】
 const bondFee = '500';
-// 合约待支付债券份额不得超出该值【Max debt bond can take on】
+//  合约当前被持有债券总额（用户购买债券支付的Token总价值OHM份额）【Max debt bond can take on】
 const maxBondDebt = '1000000000000000';
 // 初始债券数【Initial Bond debt】
 const intialBondDebt = '0'

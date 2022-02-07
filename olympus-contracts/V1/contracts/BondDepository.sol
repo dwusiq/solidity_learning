@@ -912,10 +912,10 @@ contract OlympusBondDepository is Ownable {
     address public immutable OHM; // token given as payment for bond
     address public immutable principle; // token used to create bond
     address public immutable treasury; // mints OHM when receives principle
-    address public immutable DAO; // receives profit share from bond
+    address public immutable DAO; //接收DAO手续费的地址【receives profit share from bond】
 
     bool public immutable isLiquidityBond; // LP and Reserve bonds are treated slightly different
-    address public immutable bondCalculator; // calculates value of LP tokens
+    address public immutable bondCalculator; // 债券计算合约【 calculates value of LP tokens】
 
     address public staking; // to auto-stake payout
     address public stakingHelper; // to stake and claim if no staking warmup

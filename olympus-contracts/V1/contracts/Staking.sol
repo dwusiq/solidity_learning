@@ -880,7 +880,7 @@ contract OlympusStaking is Ownable {
 
   /**
         @notice 配置合约地址【sets the contract address for LP staking】
-        @param _contract address  合约类型 0-distributor合约  1-warmup合约（只能设置一次） 2-locker合约（只能设置一次）
+        @param _contract CONTRACTS  合约类型 0-distributor合约  1-warmup合约（只能设置一次） 2-locker合约（只能设置一次）
         @param _address address   合约地址
      */
   function setContract(CONTRACTS _contract, address _address)

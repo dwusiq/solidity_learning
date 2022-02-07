@@ -66,11 +66,101 @@
   - 用户购买债券收获到的`OHM`份额=无风险价值/价格=支付的资产份额折算回`OHM`的份额/价格
   
 
-## 四、环境部署关注点
-##### `staking`合约
-* `_epochLength`: 每经过多少区块`rebase`一次，值跟`distributor`合约保持一致。
-* `_firstEpochNumber`: 首个`epoch`周期起始区块。
-* `_firstEpochBlock`：首个`epoch`周期结束区块。
+## 四、环境部署关键配置
+##### `staking`质押合约
+* 构造函数
+  - `_OHM`: `OHM`合约地址
+  - `_sOHM`: `SOHM`合约地址
+  - `_epochLength`: 每经过多少区块`rebase`一次，值跟`distributor`合约保持一致。
+  - `_firstEpochNumber`: 首个`epoch`周期起始区块。
+  - `_firstEpochBlock`：首个`epoch`周期结束区块。
+* `setContract`(设置相关合约地址)
+  - `_contract`:  合约类型 0-`distributor`合约  1-`StakingWarmup`合约（只能设置一次） 2-`locker`合约（只能设置一次）
+  - `_address`: 合约地址
+* `setWarmup`(设置质押热身期，默认0)
+  - `_warmupPeriod`: 为参与者设置热身时间（需要超过这么多区块才能领取收益
 
-##### `StakingDistributor`合约
-* `_rewardRate`：  奖励比率是于每次的变基 (rebase) 时分配给每个质押者相对于总供应量的配置百分比 ,计算公式是`IERC20(OHM).totalSupply().mul(_rate).div(1000000)`
+##### `StakingDistributor`质押分配者合约
+* 构造函数
+  - `_treasury`: `Treasury`国库合约
+  - `_ohm`: `OHM`合约
+  - `_epochLength`: 每经过多少区块`rebase`一次，值跟`staking`合约保持一致。
+  - `_nextEpochBlock`:  首个周期(`Epoch`)的结束区块
+* `addRecipient`(添加接收者，每次`rebase`给这些地址分配`OHM`)
+  - `_recipient`: 接收者地址(一定要添加`Staking`合约地址)
+  - `_rewardRate`：  奖励比率是于每次的变基 (rebase) 时分配给每个质押者相对于总供应量的配置百分比 ,计算公式是`IERC20(OHM).totalSupply().mul(_rate).div(1000000)`
+
+##### `BondDepository`债券合约(当前版本每种债券都要部署一个相应的合约)
+* 构造函数
+  - `_ohm`: `OHM`合约
+  - `_principle`: 购买债券需要支付资产地址
+  - `_treasury`:`Treasury`国库合约
+  - `_DAO`:接收`DAO`手续费的地址
+  - `_bondCalculator`:债券计算合约
+* `initializeBondTerms`(初始化债券的发行周期信息) 
+  - `_controlVariable`:`BCV`,价格控制变量,控制价格变化幅度，值越大价格变化越大。
+  - `_vestingTerm`:用户购买债券需要锁定的期限（区块个数）
+  - `_minimumPrice`:债券最低价格
+  - `_maxPayout`:合约最大单笔债券支出
+  - `_fee`:用户购买债券的手续费
+  - `_maxDebt`: 合约当前被持有债券总额（用户购买债券支付的`Token`总价值`OHM`份额）
+  - `_initialDebt`:初始化当前债券已售份额
+
+##### `Treasury`国库合约
+* `queue`:添加地址到变更授权的队列(调toggle前要先调这个接口添加地址，并且有等待期)
+  - `_managing`:授权类型的
+  - `_address`:授权地址
+* `toggle`: （事先添加到queue，并且过了等待期后，可以调这个接口）检查队列，并且切换用户的授权状态。
+  - `_managing`:授权类型的
+  - `_address`:授权地址
+  - `_calculator`: 给0地址就可以了
+
+##### `OHM`合约
+* `setVault`:设置金库合约
+  - `vault_`:金库合约地址，只有这个地址允许调用`OHM`的`mint`函数
+##### `SOHM`合约
+> 与`OHM`可以1比1兑换，质押`OHM`可以得到`SOHM`
+
+* `initialize`:初始化sOHM的参数
+  - `stakingContract_`: `staking`合约地址
+* `setIndex`: 设置起始的`index`,用户记录历史各次`rebase`的`index`和当前最新`index`对比，得出增长率。
+  - `_INDEX`: 起始`indexs`
+
+##### `StakingWarmup`热身期合约
+> 用户质押`OHM`后，把`sOHM`转到该合约，等用户领取的时候再从这里转出去
+
+* 构造函数
+  - `_staking`: `Staking`合约地址
+  - `_sOHM`:`SOHM`合约地址
+
+##### `AlphaOHM`预售合约主币
+> 预售期用户购买得到这个币，项目启动后可以到AlphaOhmMigration 1:1兑换OHM
+
+* 构造函数：写死了`Token`名称和发行总量（实际生产可能要改这块逻辑）
+
+##### `OlympusPresale`预售合约
+> 项目方转入`AOHM`到该合约，白名单用户可以参与预售，支付代币得到`AOHM`
+
+* `whiteListBuyers`: 增加预售用户白名单（实际生产可能要去掉这个功能）
+  - `_buyers`: 用户地址列表
+* `initialize`:初始化
+  - `_addressToSendDai`: 用户参与预售的`dai`将转入这个地址
+  - `_dai`: `dai`合约地址
+  - `_aOHM`: `aohm`合约地址，支付`dai`将得到`aOHM`
+  - `_salePrice`:  预售价格，`dai`/`aOHM`(每单位`aOHM`需要多少`dai`)，实际生产可能要增加接口更改
+  - `_saleLength`: 预售周期长度（时间戳）---设置该值要根据出块时间确定
+
+##### `StakingHelper`
+> 单币质押工具,质押和直接提取`SOHM`
+
+* 构造函数
+  - `_staking`: `Staking`合约地址
+  - `_OHM`: `OHM`合约地址
+
+##### `RedeemHelper`
+> 债券收益提取工具,批量收取用户的多个债券收益
+
+* `addBondContract`:增加债券合约地址
+  - `_bond`: `BondDepository`类型合约地址
+* `removeBondContract`:移除债券地址
+  - `_index`: 要删除的债券索引
