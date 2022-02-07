@@ -926,8 +926,8 @@ contract OlympusBondDepository is Ownable {
 
     mapping(address => Bond) public bondInfo; // 用户购买的债券的数据【stores bond information for depositors】
 
-    uint256 public totalDebt; // 当前需要合约支付的债券总额（单位是OHM）【total value of outstanding bonds; used for pricing】
-    uint256 public lastDecay; // 上次用户持有总债券衰减时的区块【reference block for debt decay】
+    uint256 public totalDebt; // 合约当前被持有债券总额（用户购买债券支付的Token总价值OHM份额）【total value of outstanding bonds; used for pricing】
+    uint256 public lastDecay; // 上次总债券衰减时的区块【reference block for debt decay】
 
     /* ======== STRUCTS ======== */
 
@@ -1122,6 +1122,7 @@ contract OlympusBondDepository is Ownable {
         uint256 value = ITreasury(treasury).valueOf(principle, _amount);
         //判断买入的这些份额，协议会给他多少回报(OHM)【payout to bonder is computed】
         //支付给用户的报酬=支付资产的无风险价值/价格
+        // TODO payoutFor函数的返回值比【value/价格】多两位数，不知为何
         uint256 payout = payoutFor(value);
 
         require(payout >= 10000000, "Bond too small"); // must be > 0.01 OHM ( underflow protection )
@@ -1291,6 +1292,7 @@ contract OlympusBondDepository is Ownable {
 
     /**
      *  @notice 判断买入的这些份额，协议会给他多少回报(OHM)【calculate interest due for new bond】
+     *  @notice //TODO payoutFor函数的返回值比【value/价格】多两位数，不知为何
      *  @param _value uint
      *  @return uint
      */
@@ -1303,13 +1305,15 @@ contract OlympusBondDepository is Ownable {
 
     /**
      *  @notice 计算债券当前价格【calculate current bond premium】
+     *  @notice 注意，这个价格不是直接指购买1个OHM需要支付多少DAI,而是指购买1个OHM需要支付的DAI需要价值多少OHM
+     *  @notice 也就是说，购买OHM,那么流程是：1、计算输入的DAI份额价值多少OHM，标志为OHM'。 2、再用这个OHM'值除以OHM的价格得出能得到多少OHM回报，
      *  @return price_ uint
      */
     function bondPrice() public view returns (uint256 price_) {
         //溢价（Premium） = Debt Ratio * BCV
         //价格=溢价+1=（Debt Ratio * BCV）+1
         //加1，所以价格最终>=1
-        //当债券比率是0时（即没有待合约支付的债券），返回价格=1000000000/1e7=100
+        //当债券比率是0时（即合约没有待支付的债券），返回价格=1000000000/1e7=100
         price_ = terms.controlVariable.mul(debtRatio()).add(1000000000).div(
             1e7
         );

@@ -15,9 +15,9 @@ let deployer, presaleDaiReceiptor, daoUser, staker1, user3, user4;
 //for test
 // 初始mint多少dai
 const daiDecimal = 18;
-const initialDaiMintStr = "1000";
+const initialDaiMintStr = "100000";
 const initialDaiMint = ethers.utils.parseUnits(initialDaiMintStr, daiDecimal);
-const daiApproveAmount = ethers.utils.parseUnits('100000000000000000000000000000', daiDecimal);
+const daiApproveAmount = ethers.utils.parseUnits('1000000000000000000000000000000000', daiDecimal);
 // 初始mint多少ohm
 const ohmDecimal = 9;
 // const initialOhmMint = ethers.utils.parseUnits('100000', ohmDecimal);
@@ -25,10 +25,12 @@ const ohmApproveAmount = ethers.utils.parseUnits('10000000000000000', ohmDecimal
 
 
 //for preSale（生产根据实际填写）
-const aOhmSalePriceStr = "25";//预售期25个dai买一个aOHM(注，如果价格改成小于1，则下面的预售相关的案例有部分要改动)（如果预售期ohm相对于dai的价格小于1，则项目方需要一半的钱买ohm给客户兑换，因为合约保证一个dai对应一个ohm）
-const aOhmSalePrice = ethers.utils.parseUnits(aOhmSalePriceStr, daiDecimal);  //预售期0.5个dai买一个aOHM
+const aOhmSalePriceStr = "0.25";//预售期0.25个dai买一个aOHM（如果预售期ohm相对于dai的价格小于1，则项目方需要自己拿一部分钱买ohm给客户兑换，因为合约保证一个dai对应一个ohm）
+const aOhmSalePrice = ethers.utils.parseUnits(aOhmSalePriceStr, daiDecimal);
 const aOhmSaleLength = 30 * 86400000;  //毫秒  1天=86400000
 const aOHMDuration = 100;//预售结束后，aohm兑换ohm的窗口开放时长（多少个区块）
+const deployerDepositDaiAmountFloat = parseFloat(aOhmSalePriceStr) < 1 ? parseFloat(initialDaiMintStr) / parseFloat(aOhmSalePriceStr) - parseFloat(initialDaiMintStr) : 0;//如果预售价格小于0，则项目方需要补齐差额（合约中dai和OHM价值为1:1）
+const deployerDepositDaiAmount = ethers.utils.parseUnits(deployerDepositDaiAmountFloat + "", daiDecimal);
 
 //for staking
 // 用于计算index的参数，每次rebase结束之后保存记录时用到，用户可以用来计算收益增长率（好像就没有其它作用了）【Initial staking index】
@@ -57,7 +59,9 @@ const fraxBondBCV = '690';
 const bondVestingLength = '33110';
 // 债券最低价【Min bond price】
 // 用户购买债券收获到的OHM份额=无风险价值/价格=支付的资产份额折算回OHM的份额/价格
-const minBondPrice = '0';
+// 最低价格不得低于100，由BondDepository.sol的bondPrice函数知道，当合约没有待支付债券时，债券价格最低，值为100。
+// 例如：价格是5000  支付资产价值1OHM（精度换算后是1000000000），则用户得到的OHM份额=1OHM/价格=1000000000/5000=200000=0.0002OHM
+const minBondPrice = '5000';
 // 债券每笔交易的最大支出比率（IERC20(OHM).totalSupply().mul(terms.maxPayout).div(100000);）【Max bond payout】
 const maxBondPayout = '5000'
 // 债券交易中dao手续费比率（fee = payout.mul(terms.fee).div(10000)）【DAO fee for bond(500 = 5% = 0.05 for every 1 paid)】
@@ -179,36 +183,34 @@ async function purchaseAOHM() {
  */
 async function firstDepositForOHM() {
     console.log(">>>>>> firstDepositForOHM start");
-    let presaleDaiReceiptorOwnDaiAmount = await deployedDAI.balanceOf(presaleDaiReceiptor.address);
-    console.log("presaleDaiReceiptorOwnDaiAmount:%s", presaleDaiReceiptorOwnDaiAmount);
-    let depositDaiAmountStr = ethers.utils.formatUnits(presaleDaiReceiptorOwnDaiAmount, daiDecimal);
-    console.log("before deposit,presaleDaiReceiptorOwnDaiAmount:%s", presaleDaiReceiptorOwnDaiAmount);
-    await deployedDAI.connect(presaleDaiReceiptor).approve(deployedTreasury.address, daiApproveAmount);
 
-    //首次进DAI和出OHM的份额比已确定了他们的价格比(注意，如果有引入预售，需要结合预售的价格配置比例，如果这里投入的dai产出的OHM比预售的高，则会导致项目方自己垫钱)
-    // 计算存储的dai份额根据价格运算总应得多少OHM
-    let outOHMAmount = parseFloat(depositDaiAmountStr) / parseFloat(aOhmSalePriceStr);//计算dai对应的OHM产出
+    //计算presaleDaiReceiptor收到的dai价值多少OHM
+    let presaleDaiReceiptorOwnDaiAmount = await deployedDAI.balanceOf(presaleDaiReceiptor.address);
+    let outOHMAmount = parseFloat(ethers.utils.formatUnits(presaleDaiReceiptorOwnDaiAmount, daiDecimal)) / parseFloat(aOhmSalePriceStr);//计算dai对应的OHM产出
     let outOHMAmountBitnumber = ethers.utils.parseUnits(outOHMAmount + "", ohmDecimal);
+
+    console.log("presaleDaiReceiptorOwnDaiAmount:%s outOHMAmountBitnumber:%s", presaleDaiReceiptorOwnDaiAmount, outOHMAmountBitnumber);
     // 计算指定资产的份额价值多少OHM(无风险价值RFV)
     let rfvValue = await deployedTreasury.valueOfToken(deployedDAI.address, presaleDaiReceiptorOwnDaiAmount);
     //计算留在`Treasury`作为多余的储备金（如果分红份额是0，则后续不能质押ohm,因为没有多余的dai储备金）
     let profitAmount = rfvValue.sub(outOHMAmountBitnumber);
-    console.log("rfvValue:%s profitAmount:%s", rfvValue, profitAmount);
+    if (parseFloat(aOhmSalePriceStr) < 1) {
+        profitAmount = 0;
+        //如果预售价格小于1，则项目方自己存入部分DAI作为多余的储备金,用于支持质押OHM
+        console.log("deployerDepositDaiAmount:%s", deployerDepositDaiAmount);
+        await deployedDAI.connect(deployer).mint(deployer.address, deployerDepositDaiAmount);
+        await deployedDAI.connect(deployer).approve(deployedTreasury.address, daiApproveAmount);
+        await deployedTreasury.connect(deployer).deposit(deployerDepositDaiAmount, deployedDAI.address, 0);
+        await deployedOHM.connect(deployer).transfer(presaleDaiReceiptor.address, await deployedOHM.balanceOf(deployer.address));
+    }
+
+    //计算实际要存储的dai份额
+    presaleDaiReceiptorOwnDaiAmount = await deployedDAI.balanceOf(presaleDaiReceiptor.address);
+    console.log("final presaleDaiReceiptorOwnDaiAmount:%s", deployerDepositDaiAmount);
+    await deployedDAI.connect(presaleDaiReceiptor).approve(deployedTreasury.address, daiApproveAmount);
+
+    console.log("rfvValue:%s presaleDaiReceiptorOwnDaiAmount:%s profitAmount:%s", rfvValue, presaleDaiReceiptorOwnDaiAmount, profitAmount);
     await deployedTreasury.connect(presaleDaiReceiptor).deposit(presaleDaiReceiptorOwnDaiAmount, deployedDAI.address, profitAmount);
-
-    //份额确认
-    let presaleDaiReceiptorOwnOhmAmount = await deployedOHM.balanceOf(presaleDaiReceiptor.address);
-    let expectPresaleDaiReceiptorOwnOhmAmount = ethers.utils.parseUnits(outOHMAmount + "", ohmDecimal);
-    console.log("after deposit, expectPresaleDaiReceiptorOwnOhmAmount:%s presaleDaiReceiptorOwnOhmAmount:%s", expectPresaleDaiReceiptorOwnOhmAmount, presaleDaiReceiptorOwnOhmAmount);
-    assert.equal(parseFloat(ethers.utils.formatUnits(presaleDaiReceiptorOwnOhmAmount, ohmDecimal)), outOHMAmount);
-
-    // //项目方自己质押一些dai进入，用于初始支持staking分红
-    // await deployedDAI.connect(deployer).mint(deployer.address, initialDaiMint);
-    // await deployedDAI.connect(deployer).approve(deployedTreasury.address, daiApproveAmount);
-    // //项目方本次存入的所有份额都用来作为第一轮分红
-    // let ohmAmountForProfit = ethers.utils.parseUnits(ethers.utils.formatUnits(initialDaiMint, daiDecimal), ohmDecimal);
-    // await deployedTreasury.connect(deployer).deposit(initialDaiMint, deployedDAI.address, ohmAmountForProfit);
-
 
     console.log(">>>>>> firstDepositForOHM finish");
 }
@@ -281,7 +283,9 @@ async function initAfterDeploy() {
     //RESERVEDEPOSITOR:0-允许存入储备金   这是为了在firstDepositForOHM函数中，首次存入储备金
     await deployedTreasury.queue('0', presaleDaiReceiptor.address);
     await deployedTreasury.toggle('0', presaleDaiReceiptor.address, zeroAddress);
-
+    //RESERVEDEPOSITOR:0-允许存入储备金   这是为了在firstDepositForOHM函数中，首次存入储备金(实际生产中可以不给权限这个地址)
+    await deployedTreasury.queue('0', deployer.address);
+    await deployedTreasury.toggle('0', deployer.address, zeroAddress);
 
     //初始化sOHM的参数
     await deployedSOHM.initialize(deployedStaking.address);
@@ -370,25 +374,28 @@ async function bondTest() {
 
     //给用户初始化dai份额
     await deployedDAI.connect(deployer).mint(bonder1.address, initialDaiMint);
-    //债券价格
-    let bondPrice = await deployedDaiBond.bondPrice();
-    console.log("bondPrice:%s", bondPrice);
 
     //购买债券
     await deployedDAI.connect(bonder1).approve(deployedDaiBond.address, initialDaiMint);
 
-    let totalBuyAmount = initialDaiMint;
-    while (totalBuyAmount > 0) {
-        //查询当前合约最大单笔支付份额（OHM）
-        let maxPayout = await deployedDaiBond.maxPayout();
-        //查询当前OHM价格（用户需要支付多少）
-        let price = await deployedDaiBond.bondPrice();
-        //计算购买的最大份额
-        let maxBuyAmount = maxPayout * price;
-        console.log("maxPayout:%s price:%s maxBuyAmount:%s", maxPayout, price, maxBuyAmount);
-        await deployedDaiBond.connect(bonder1).deposit(maxBuyAmount, bondPrice, bonder1.address);
+    let defaultBuyAmountOnDai = initialDaiMint.div(5);
+    for (let i = 1; i <= 5; i++) {
+        //查询当前合约最大单笔支付份额（OHM）--显示值为OHM的精度
+        let maxPayOutOnOHM = await deployedDaiBond.maxPayout();
+        //查询当前价格
+        let currentPrice = await deployedDaiBond.bondPrice();
+        //获取单笔购买债券，支持支付资产价值OHM最大份额(payoutFor函数的返回值比【value/价格】多两位数，不知为何)
+        let maxOhmValue = maxPayOutOnOHM.mul(currentPrice).div(100);
+        //将OHM精度的份额转回DAI精度的份额
+        let maxBuyAmountOnDai = ethers.utils.parseUnits(maxOhmValue + "", daiDecimal - ohmDecimal);
+        console.log("defaultBuyAmountOnDai:%s",defaultBuyAmountOnDai);
+        console.log("maxBuyAmountOnDai:%s",maxBuyAmountOnDai);
+        console.log("defaultBuyAmountOnDai.gt(maxBuyAmountOnDai):%s",defaultBuyAmountOnDai.gt(maxBuyAmountOnDai));
+        let buyAmountOnDai = defaultBuyAmountOnDai.gt(maxBuyAmountOnDai)?maxBuyAmountOnDai:defaultBuyAmountOnDai;
+
+        console.log("defaultBuyAmountOnDai:%s maxBuyAmountOnDai:%s buyAmountOnDai:%s", defaultBuyAmountOnDai, maxBuyAmountOnDai, buyAmountOnDai);
+        await deployedDaiBond.connect(bonder1).deposit(buyAmountOnDai, currentPrice, bonder1.address);
         await time.advanceBlockTo(parseInt(await time.latestBlock()) + 1);
-        totalBuyAmount = totalBuyAmount.sub(maxBuyAmount);
     }
     //查询债券信息
     let bonder1BondInfo = await deployedDaiBond.bondInfo(bonder1.address);

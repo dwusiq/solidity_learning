@@ -927,7 +927,7 @@ contract MockOlympusBondDepository is Ownable {
 
     mapping(address => Bond) public bondInfo; // stores bond information for depositors
 
-    uint256 public totalDebt; // 当前用户持有的债券总额【total value of outstanding bonds; used for pricing】
+    uint256 public totalDebt; // 合约当前被持有债券总额（用户购买债券支付的Token总价值OHM份额）【total value of outstanding bonds; used for pricing】
     uint256 public lastDecay; // 上次债券衰减区块【reference block for debt decay】
 
     /* ======== STRUCTS ======== */
@@ -1129,14 +1129,22 @@ contract MockOlympusBondDepository is Ownable {
         console.log("_amount:%s", _amount);
         console.log("value:%s", value);
         console.log("payout:%s", payout);
-        console.log("maxPayout:%s", IERC20(OHM).totalSupply().mul(terms.maxPayout).div(100000));
+        console.log(
+            "maxPayout:%s",
+            IERC20(OHM).totalSupply().mul(terms.maxPayout).div(100000)
+        );
 
         require(payout >= 10000000, "Bond too small"); // must be > 0.01 OHM ( underflow protection )
         require(payout <= maxPayout(), "Bond too large"); // 1OHM=1000000000  size protection because there is no slippage
 
         // profits are calculated
         uint256 fee = payout.mul(terms.fee).div(10000);
+        console.log("value:%s",value);
+        console.log("fee:%s",fee);
+        console.log("payout:%s",payout);
         uint256 profit = value.sub(payout).sub(fee);
+        console.log("profit:%s",profit);
+
 
         /**
             principle is transferred in
@@ -1289,6 +1297,7 @@ contract MockOlympusBondDepository is Ownable {
      *  @return uint
      */
     function maxPayout() public view returns (uint256) {
+        console.log("IERC20(OHM).totalSupply():%s",IERC20(OHM).totalSupply());
         return IERC20(OHM).totalSupply().mul(terms.maxPayout).div(100000);
     }
 
@@ -1298,9 +1307,7 @@ contract MockOlympusBondDepository is Ownable {
      *  @return uint
      */
     function payoutFor(uint256 _value) public view returns (uint256) {
-      console.log("_value:%s",_value);
-      console.log("bondPrice():%s",bondPrice());
-      console.log("FixedPoint.fraction(_value, bondPrice()).decode112with18():%s",FixedPoint.fraction(_value, bondPrice()).decode112with18());
+        console.log("FixedPoint.fraction(_value, bondPrice()).decode112with18():%s",FixedPoint.fraction(_value, bondPrice()).decode112with18());
         return
             FixedPoint.fraction(_value, bondPrice()).decode112with18().div(
                 1e16
@@ -1308,7 +1315,9 @@ contract MockOlympusBondDepository is Ownable {
     }
 
     /**
-     *  @notice calculate current bond premium
+     *  @notice 计算债券当前价格【calculate current bond premium】
+     *  @notice 注意，这个价格不是直接指购买1个OHM需要支付多少DAI,而是指购买1个OHM需要支付的DAI需要价值多少OHM
+     *  @notice 也就是说，购买OHM,那么流程是：1、计算输入的DAI份额价值多少OHM，标志为OHM'。 2、再用这个OHM'值除以OHM的价格计算出能得到多少OHM回报，
      *  @return price_ uint
      */
     function bondPrice() public view returns (uint256 price_) {
@@ -1327,14 +1336,7 @@ contract MockOlympusBondDepository is Ownable {
     function _bondPrice() internal returns (uint256 price_) {
         //债券价格=[（缩放变量*债券比率）+1]/1e7
         uint256 ratio = debtRatio();
-        price_ = terms.controlVariable.mul(ratio).add(1000000000).div(
-            1e7
-        );
-        console.log("controlVariable:%s", terms.controlVariable);
-        console.log("ratio:%s", ratio);
-        console.log("terms.controlVariable.mul(ratio):%s", terms.controlVariable.mul(ratio));
-        console.log("terms.controlVariable.mul(ratio).add(1000000000):%s", terms.controlVariable.mul(ratio).add(1000000000));
-        console.log("price_:%s", price_);
+        price_ = terms.controlVariable.mul(ratio).add(1000000000).div(1e7);
         if (price_ < terms.minimumPrice) {
             price_ = terms.minimumPrice;
         } else if (terms.minimumPrice != 0) {
@@ -1343,7 +1345,7 @@ contract MockOlympusBondDepository is Ownable {
     }
 
     /**
-     *  @notice converts bond price to DAI value
+     *  @notice 用USD的精度表示OHM的价格，例如，1OHM价值1DAI,则返回值为1e18【converts bond price to DAI value】
      *  @return price_ uint
      */
     function bondPriceInUSD() public view returns (uint256 price_) {

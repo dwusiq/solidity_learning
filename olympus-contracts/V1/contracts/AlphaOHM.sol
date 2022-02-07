@@ -215,7 +215,7 @@ contract AlphaOHM is Divine {
 
     constructor() Divine("Alpha Olympus", "alphaOHM", 9) {
       //计划预售的份额（先给owner,再由owner转到预售合约）
-        _mint(_owner, 50000000000000);
+        _mint(_owner, 500000000000000);
     }
 
     function burn(uint256 amount) external {
