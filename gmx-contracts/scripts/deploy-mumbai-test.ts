@@ -31,16 +31,11 @@ let usdtDecimal = 6; //
 
 //合约地址
 let deployedVault: any,
-  vaultAddr = ""; //Vault
+  vaultAddr = "0x0Ed8AEfE3b7CE6Ebd9e9a4E30615eD6b185d4312"; //Vault
 
 //部署合约
 async function deployContract() {
-  //TokenedConvertContract
-  console.log("vaultAddr.old", vaultAddr);
-
   [deployedVault, vaultAddr] = await deploy("Vault", vaultAddr, []);
-  console.log("deployedVault.address", deployedVault.address);
-  console.log("vaultAddr", vaultAddr);
 }
 
 //主程序运行前配置
@@ -73,13 +68,13 @@ async function tmpSet() {}
 async function main() {
   [deployer] = await ethers.getSigners();
   deployerAddress = deployer.address;
-  console.log(">>>>deployer:", deployer.address);
+  console.log(">>>>deployerAddress:", deployerAddress);
 
   //部署合约
   await deployContract();
 
   // 需要临时调用的接口在这里写
-  await tmpSet();
+  // await tmpSet();
   console.log("deploy finish");
 }
 

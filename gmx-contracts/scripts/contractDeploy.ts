@@ -43,12 +43,12 @@ async function baseDeploy(
 
     await deployedContract.deployed();
     selfAddress = deployedContract.address;
+    console.log(`${contractName} deploy finish, address: ${selfAddress}`);
     await sleep(6000);
   } else {
-    console.log(`init ${contractName} by address:${selfAddress}  start`);
     deployedContract = Contract.attach(selfAddress);
+    console.log(`init ${contractName} success. address: ${selfAddress}`);
   }
-  console.log(`${contractName} deploy finish, address:${selfAddress}  start`);
   return [deployedContract, selfAddress];
 }
 
