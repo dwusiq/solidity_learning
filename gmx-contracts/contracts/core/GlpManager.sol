@@ -14,8 +14,6 @@ import "../access/Governable.sol";
 
 pragma solidity 0.6.12;
 
-// import "hardhat/console.sol";
-
 contract GlpManager is ReentrancyGuard, Governable, IGlpManager {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;

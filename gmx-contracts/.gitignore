@@ -13,8 +13,9 @@ data/holders
 data/contractList
 flattened
 distribution-data*.json
+fee-reference.json
+uniswap-fee-reference.json
 **/.DS_Store
-env.json
 
 #Hardhat files
 cache

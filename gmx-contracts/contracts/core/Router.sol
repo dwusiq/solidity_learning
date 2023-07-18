@@ -11,7 +11,6 @@ import "../tokens/interfaces/IWETH.sol";
 import "./interfaces/IVault.sol";
 import "./interfaces/IRouter.sol";
 
-import "hardhat/console.sol";
 contract Router is IRouter {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
@@ -207,11 +206,6 @@ contract Router is IRouter {
             amountOut = IVault(vault).swap(_tokenIn, _tokenOut, _receiver);
         }
 
-        console.log(">>_receiver",_receiver);
-        console.log(">>_tokenIn",_tokenIn);
-        console.log(">>_tokenOut",_tokenOut);
-        console.log(">>amountOut",amountOut);
-        console.log(">>_minOut",_minOut);
         require(amountOut >= _minOut, "Router: insufficient amountOut");
         return amountOut;
     }

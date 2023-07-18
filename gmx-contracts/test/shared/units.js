@@ -5,14 +5,4 @@ function toUsd(value) {
 
 toNormalizedPrice = toUsd
 
-//睡眠指定时间
-function sleep(ms) {
-  console.log(moment().format("YYYYMMDD HH:mm:ss"), "DEBUG", "sleep ms " + ms);
-  if (!isLocalTest) {
-    return new Promise((resolve) => {
-      setTimeout(resolve, ms);
-    });
-  }
-}
-
-module.exports = { toUsd, toNormalizedPrice, sleep }
+module.exports = { toUsd, toNormalizedPrice }

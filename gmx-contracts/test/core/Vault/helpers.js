@@ -1,7 +1,8 @@
-const { expandDecimals } = require("./utilities")
-const { toUsd } = require("./units")
+const { expandDecimals } = require("../../shared/utilities")
+const { toUsd } = require("../../shared/units")
+const { deployContract } = require("../../shared/fixtures")
 
-const vaultErrors = [
+const errors = [
   "Vault: zero error",
   "Vault: already initialized",
   "Vault: invalid _maxLeverage",
@@ -60,34 +61,34 @@ const vaultErrors = [
   "Vault: maxGasPrice exceeded"
 ]
 
-// async function initVaultErrors(vault) {
-//   const vaultErrorController = await deployContract("VaultErrorController", [])
-//   await vault.setErrorController(vaultErrorController.address)
-//   await vaultErrorController.setErrors(vault.address, errors);
-//   return vaultErrorController
-// }
+async function initVaultErrors(vault) {
+  const vaultErrorController = await deployContract("VaultErrorController", [])
+  await vault.setErrorController(vaultErrorController.address)
+  await vaultErrorController.setErrors(vault.address, errors);
+  return vaultErrorController
+}
 
-// async function initVaultUtils(vault) {
-//   const vaultUtils = await deployContract("VaultUtils", [vault.address])
-//   await vault.setVaultUtils(vaultUtils.address)
-//   return vaultUtils
-// }
+async function initVaultUtils(vault) {
+  const vaultUtils = await deployContract("VaultUtils", [vault.address])
+  await vault.setVaultUtils(vaultUtils.address)
+  return vaultUtils
+}
 
-// async function initVault(vault, router, usdg, priceFeed) {
-//   await vault.initialize(
-//     router.address, // router
-//     usdg.address, // usdg
-//     priceFeed.address, // priceFeed
-//     toUsd(5), // liquidationFeeUsd
-//     600, // fundingRateFactor
-//     600 // stableFundingRateFactor
-//   )
+async function initVault(vault, router, usdg, priceFeed) {
+  await vault.initialize(
+    router.address, // router
+    usdg.address, // usdg
+    priceFeed.address, // priceFeed
+    toUsd(5), // liquidationFeeUsd
+    600, // fundingRateFactor
+    600 // stableFundingRateFactor
+  )
 
-//   const vaultUtils = await initVaultUtils(vault)
-//   const vaultErrorController = await initVaultErrors(vault)
+  const vaultUtils = await initVaultUtils(vault)
+  const vaultErrorController = await initVaultErrors(vault)
 
-//   return { vault, vaultUtils, vaultErrorController }
-// }
+  return { vault, vaultUtils, vaultErrorController }
+}
 
 async function validateVaultBalance(expect, vault, token, offset) {
   if (!offset) { offset = 0 }
@@ -147,25 +148,12 @@ function getDaiConfig(dai, daiPriceFeed) {
   ]
 }
 
-function getUsdtConfig(usdt, usdtPriceFeed) {
-  return [
-    usdt.address, // _token
-    18, // _tokenDecimals
-    10000, // _tokenWeight
-    75, // _minProfitBps
-    0, // _maxUsdgAmount
-    true, // _isStable
-    false // _isShortable
-  ]
-}
-
 module.exports = {
-  vaultErrors,
-  // initVault,
+  errors,
+  initVault,
   validateVaultBalance,
   getBnbConfig,
   getBtcConfig,
   getEthConfig,
-  getDaiConfig,
-  getUsdtConfig
+  getDaiConfig
 }
