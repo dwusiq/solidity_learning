@@ -1,0 +1,84 @@
+import { ethers, upgrades } from "hardhat";
+let moment = require("moment");
+
+let isLocalTest = false; //是否是本地测试， true: 本地测试  false: 部署远程节点    如果本地测试则部署之后不会进行睡眠
+async function openLocalTest() {
+  isLocalTest = true;
+}
+
+//睡眠指定时间
+function sleep(ms: any) {
+  console.log(moment().format("YYYYMMDD HH:mm:ss"), "DEBUG", "sleep ms " + ms);
+  if (!isLocalTest) {
+    return new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    });
+  }
+}
+
+/**
+ * @notice  合约部署基础函数
+ * @param isUpgrade 是不是可升级合约 true-可升级合约 false-不可升级合约
+ * @param contractName 合约名称
+ * @param selfAddress 合约自己的地址 为空时部署新的，否则只是将合约关联到该地址
+ * @param params 合约部署的入参
+ */
+async function baseDeploy(
+  isUpgrade: boolean,
+  contractName: string,
+  selfAddress: string,
+  params: any[]
+) {
+  const Contract = await ethers.getContractFactory(contractName);
+  let deployedContract: any;
+  if (!selfAddress || selfAddress == "") {
+    console.log(`deploy ${contractName} start`);
+    if (isUpgrade) {
+      deployedContract = await upgrades.deployProxy(Contract, params, {
+        initializer: "initialize",
+      });
+    } else {
+      deployedContract = await Contract.deploy(params);
+    }
+
+    await deployedContract.deployed();
+    selfAddress = deployedContract.address;
+    await sleep(6000);
+  } else {
+    console.log(`init ${contractName} by address:${selfAddress}  start`);
+    deployedContract = Contract.attach(selfAddress);
+  }
+  console.log(`${contractName} deploy finish, address:${selfAddress}  start`);
+  return [deployedContract, selfAddress];
+}
+
+//默认的部署
+async function deploy(
+  contractName: string,
+  selfAddress: string,
+  params: any[]
+) {
+  return baseDeploy(false, contractName, selfAddress, params);
+}
+
+//可升级的部署
+async function upgradeDeploy(
+  contractName: string,
+  selfAddress: string,
+  params: any[]
+) {
+  return baseDeploy(true, contractName, selfAddress, params);
+}
+
+/**
+ * @notice 升级已部署的合约合约
+ * @param selfAddress 自己的地址
+ */
+async function upgradeContract(contractName: string, selfAddress: string) {
+  const Contract = await ethers.getContractFactory(contractName);
+  const upgraded = await upgrades.upgradeProxy(selfAddress, Contract);
+  console.log(`${contractName} upgrade finish, address:${selfAddress}`);
+  return upgraded;
+}
+
+export { deploy, upgradeDeploy, upgradeContract };
