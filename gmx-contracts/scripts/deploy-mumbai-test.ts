@@ -11,7 +11,8 @@ const { HashZero, AddressZero } = ethers.constants;
 
 //用户及地址
 let deployer: any;
-let deployerAddress = ""; //不用填，会自动赋值
+let deployerAddress = "0x83B99A8f769048d3344eaC186e363Cd249B06891"; //不用填，会自动赋值  TODO 根据实际填写Owner地址
+let govAddress = ""; //owner,最好是多签地址
 
 //constant
 const isLocalTest = false;
@@ -20,17 +21,30 @@ const usdtDecimal = 6;
 const ONE_DAY_BLOCK = A_DAY_SECONDS / 2; //每天区块数
 const depositFee = 30; // 0.3%
 const minExecutionFee = ethers.utils.parseEther("0.0001"); // 0.0001 ETH
-const cooldownDuration = 15 * 60;
-const timeLockBuff = 5 * 24 * 60 * 60;
+const cooldownDuration = 15 * A_MINUTES_SECONDS; //添加流动行之后需要过多久才能赎回
+const timeLockBuff = 5 * A_DAY_SECONDS;
 const marginFeeBasisPoints = 10; //0.1%
 const maxMarginFeeBasisPoints = 500; //5%
 //vault相关常量
 const liquidationFeeUsd = parseU(2); //添加流动性的手续费
 const fundingRateFactor = 100; //非稳定币资金费率因子(用于计算资金费率)
 const stableFundingRateFactor = 100; //稳定币资金费率因子(用于计算资金费率)
-const fundingInterval = 60 * 60; //资金费率周期时长(秒)
+const fundingInterval = A_HOUR_SECONDS; //资金费率周期时长(秒)
 //orderBook
 const minPurchaseTokenAmountUsd = parseU(10); // min purchase token amount usd
+//PositionRouter
+const minBlockDelayKeeper = 0; //头寸数据过多久才能被keeper操作
+const minTimeDelayPublic = 3 * A_MINUTES_SECONDS; //头寸数据过多久才能被任何用户操作
+const maxTimeDelay = 30 * A_MINUTES_SECONDS; //头寸数据有效时长
+//ShortsTrackerTimelock
+const buffer = A_MINUTES_SECONDS; // 60 seconds
+const updateDelay = 5 * A_MINUTES_SECONDS; // 300 seconds, 5 minutes
+const maxAveragePriceChange = 20; // 0.2%
+const shortsTrackerKeeperArray = [deployerAddress]; //short头寸的keeper
+//PositionManager
+const orderKeepers = [deployerAddress]; //头寸的keeper
+const liquidators = [deployerAddress]; //清算用户
+const partnerContracts = []; //
 
 //合约地址
 let deployedVault: any; //Vault
@@ -71,6 +85,9 @@ let deployedRewardReader: any; //RewardReader
 let rewardReaderAddr = "";
 let deployedOrderBookReader: any; //OrderBookReader
 let orderBookReaderAddr = "";
+let deployedShortsTrackerTimelock: any; //ShortsTrackerTimelock
+let shortsTrackerTimelockAddr = "";
+
 //priceFee
 let deployedPriceFeedBtcUsd: any; //PriceFeeBtcUSD
 let priceFeedBtcUsdAddr = "0x007A22900a3B98143368Bd5906f8E17e9867581b";
@@ -96,6 +113,9 @@ async function deployContract() {
   [deployedOrderBook, orderBookAddr] = await deploy("OrderBook", orderBookAddr, []);
   [deployedOrderBookReader, orderBookReaderAddr] = await deploy("OrderBookReader", orderBookReaderAddr, []);
   [deployedVaultErrorController, vaultErrorControllerAddr] = await deploy("VaultErrorController", vaultErrorControllerAddr, []);
+
+  const shortsTrackerTimelockArgs = [deployerAddress, buffer, updateDelay, maxAveragePriceChange];
+  [deployedShortsTrackerTimelock, shortsTrackerTimelockAddr] = await deploy("ShortsTrackerTimelock", shortsTrackerTimelockAddr, shortsTrackerTimelockArgs);
 
   const positionManagerArgs = [vaultAddr, routerAddr, shortsTrackerAddr, wethAddr, depositFee, orderBookAddr];
   [deployedPositionManager, positionManagerAddr] = await deploy("PositionManager", positionManagerAddr, positionManagerArgs);
@@ -151,6 +171,7 @@ async function initBeforMainProcessLaunch() {
   console.log("initBeforMainProcessLaunch.success");
 }
 
+//GlpManager
 async function initSupportGlpManager() {
   console.log("initSupportGlpManager.start");
   //配置GlpManager  true-不允许增减流动性
@@ -164,6 +185,7 @@ async function initSupportGlpManager() {
   console.log("initSupportGlpManager.success");
 }
 
+//OrderBook
 async function initSupportOrderBook() {
   console.log("initSupportOrderBook.start");
   await waitTrans(
@@ -171,6 +193,51 @@ async function initSupportOrderBook() {
     "orderBook.initialize"
   );
   console.log("initSupportOrderBook.success");
+}
+
+//ShortsTrackerTimelock
+async function initSupportShortsTrackerTimelock() {
+  console.log("initSupportShortsTrackerTimelock.start");
+  for (let keeper of shortsTrackerKeeperArray) {
+    await waitTrans(deployedShortsTrackerTimelock.setContractHandler(keeper, true), `shortsTrackerTimelock.setContractHandler ${keeper}`);
+  }
+  console.log("initSupportShortsTrackerTimelock.success");
+}
+
+//positionRouter
+async function initSupportPositionRouter() {
+  console.log("initSupportPositionRouter.start");
+  await waitTrans(deployedShortsTrackerTimelock.signalSetHandler(positionRouterAddr, true), "shortsTrackerTimelock.signalSetHandler(positionRouter)");
+  await waitTrans(deployedRouter.addPlugin(positionRouterAddr), "router.addPlugin");
+  await waitTrans(deployedPositionRouter.setDelayValues(minBlockDelayKeeper, minTimeDelayPublic, maxTimeDelay), "positionRouter.setDelayValues");
+  await waitTrans(deployedTimelock.setContractHandler(positionRouterAddr, true), "timelock.setContractHandler(positionRouter)");
+  await waitTrans(deployedPositionRouter.setGov(await deployedVault.gov()), "positionRouter.setGov"); //TODO 多签合约,暂用deployer,因此不需要设置
+  await waitTrans(deployedPositionRouter.setAdmin(deployerAddress), "positionRouter.setAdmin");
+  console.log("initSupportPositionRouter.success");
+}
+
+//PositionManager
+async function initSupportPositionManager() {
+  console.log("initSupportPositionManager.start");
+
+  for (let orderKeeper of orderKeepers)
+    await waitTrans(deployedPositionManager.setOrderKeeper(orderKeeper), "deployedPositionManager.setOrderKeeper(orderKeeper)");
+
+  for (let liquidator of liquidators)
+    await waitTrans(deployedPositionManager.setLiquidator(liquidator, true), "deployedPositionManager.setLiquidator(liquidator)");
+
+  for (let partnerContract of partnerContracts)
+    await waitTrans(deployedPositionManager.setPartner(partnerContract, true), "deployedPositionManager.setPartner(partnerContract)");
+
+  await waitTrans(deployedPositionManager.setShouldValidateIncreaseOrder(false), "deployedPositionManager.setShouldValidateIncreaseOrder(false)");
+  await waitTrans(deployedTimelock.setContractHandler(deployedPositionManager.address, true), "timelock.setContractHandler");
+
+  await waitTrans(deployedTimelock.setLiquidator(vaultAddr, deployedPositionManager.address, true), "timelock.setLiquidator");
+  await waitTrans(deployedShortsTracker.setHandler(deployedPositionManager.address, true), "shortsTracker.setContractHandler");
+  await waitTrans(deployedRouter.addPlugin(deployedPositionManager.address), "router.addPlugin(positionManager)");
+  await waitTrans(deployedPositionManager.setGov(await deployedVault.gov()), "deployedPositionManager.setGov");
+
+  console.log("initSupportPositionManager.success");
 }
 
 //升级staking合约
@@ -200,6 +267,13 @@ async function main() {
   await initSupportGlpManager();
   //配置订单簿
   await initSupportOrderBook();
+  //配置ShortsTrackerTimelock
+  await initSupportShortsTrackerTimelock();
+  //配置PositionRouter
+  await initSupportPositionRouter();
+  //配置PositionManager
+  await initSupportPositionManager();
+
   // 需要临时调用的接口在这里写
   // await tmpSet();
   console.log("deploy finish");
