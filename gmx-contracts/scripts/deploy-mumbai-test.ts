@@ -5,8 +5,8 @@ const moment = require("moment");
 const fs = require("fs");
 const Web3 = require("web3");
 const { ethers, artifacts } = require("hardhat");
-const { sleep, deploy, upgradeDeploy, upgradeContract } = require("./contractDeploy.ts");
-const { A_MINUTES_SECONDS, A_HOUR_SECONDS, A_DAY_SECONDS, A_WEEK_SECONDS } = require("./constants.ts");
+const { sleep, deploy, waitTrans, upgradeDeploy, upgradeContract } = require("./contractDeploy.ts");
+const { A_MINUTES_SECONDS, A_HOUR_SECONDS, A_DAY_SECONDS, A_WEEK_SECONDS, errorConfigs } = require("./constants.ts");
 const { HashZero, AddressZero } = ethers.constants;
 
 //用户及地址
@@ -24,6 +24,13 @@ const cooldownDuration = 15 * 60;
 const timeLockBuff = 5 * 24 * 60 * 60;
 const marginFeeBasisPoints = 10; //0.1%
 const maxMarginFeeBasisPoints = 500; //5%
+//vault相关常量
+const liquidationFeeUsd = parseU(2); //添加流动性的手续费
+const fundingRateFactor = 100; //非稳定币资金费率因子(用于计算资金费率)
+const stableFundingRateFactor = 100; //稳定币资金费率因子(用于计算资金费率)
+const fundingInterval = 60 * 60; //资金费率周期时长(秒)
+//orderBook
+const minPurchaseTokenAmountUsd = parseU(10); // min purchase token amount usd
 
 //合约地址
 let deployedVault: any; //Vault
@@ -64,7 +71,13 @@ let deployedRewardReader: any; //RewardReader
 let rewardReaderAddr = "";
 let deployedOrderBookReader: any; //OrderBookReader
 let orderBookReaderAddr = "";
-
+//priceFee
+let deployedPriceFeedBtcUsd: any; //PriceFeeBtcUSD
+let priceFeedBtcUsdAddr = "0x007A22900a3B98143368Bd5906f8E17e9867581b";
+let deployedPriceFeedEthUsd: any; //PriceFeeEthUSD
+let priceFeedEthUsdAddr = "0x0715A7794a1dc8e42615F059dD6e406A6594651A";
+let deployedPriceFeedMaticUsd: any; //PriceFeeMaticUSD
+let priceFeedMaticUsdAddr = "0xd0D5e3DB44DE05E9F294BB0a3bEEaF030DE24Ada";
 
 //部署合约
 async function deployContract() {
@@ -109,19 +122,55 @@ async function deployContract() {
     maxMarginFeeBasisPoints,
   ];
   [deployedTimelock, timelockAddr] = await deploy("Timelock", timelockAddr, timeLockArgs);
+
+  //priceFeed
+  [deployedPriceFeedBtcUsd, priceFeedBtcUsdAddr] = await deploy("PriceFeed", priceFeedBtcUsdAddr, []);
+  [deployedPriceFeedEthUsd, priceFeedEthUsdAddr] = await deploy("PriceFeed", priceFeedEthUsdAddr, []);
+  [deployedPriceFeedMaticUsd, priceFeedMaticUsdAddr] = await deploy("PriceFeed", priceFeedMaticUsdAddr, []);
 }
 
 //主程序运行前配置
 async function initBeforMainProcessLaunch() {
-  console.log("initBeforLaunch.start");
-  //注册默认用户
-  // const userInfoArray = [{ nodeLevel: 0, slfeAddress: deployerAddress, slfeCode: "0xAbcd1234", inviter: AddressZero, inviterCode: "0x00000000" }];
-  // await waitTrans(await deployedSignUpContract.setUserInfo(userInfoArray), "set user register info");
-  //sThsToken合约配置质押合约地址
-  // await waitTrans(await deployedSThsToken.setAddress([0], [stakingAddress]), "sThsToken set stakingAddress");
-  // //国库添加thsToken合约地址
-  // await waitTrans(await deployedTreasury.setThsToken(deployedThsToken.address), "treasury set thsAddress");
-  console.log("initAfterPresaleFinish.success");
+  console.log("initBeforMainProcessLaunch.start");
+
+  //配置TimeLock
+  await waitTrans(await deployedTimelock.setVaultUtils(vaultUtilsAddr), "timelock.setVaultUtils");
+
+  //配置GLP  true-只能白名单转账
+  await waitTrans(await deployedGLP.setInPrivateTransferMode(true), "GLP.setInPrivateTransferMode");
+
+  //配置vault
+  await waitTrans(
+    await deployedVault.initialize(routerAddr, usdgAddr, vaultUtilsAddr, liquidationFeeUsd, fundingRateFactor, stableFundingRateFactor),
+    "Vault.initialize"
+  );
+  await waitTrans(await deployedVault.setFundingRate(fundingInterval, fundingRateFactor, stableFundingRateFactor), "vault.setFundingRate");
+  await waitTrans(await deployedVault.setVaultUtils(vaultUtilsAddr), "Vault.setVaultUtils");
+  await waitTrans(await deployedVault.setErrorController(vaultErrorControllerAddr), "Vault.setErrorController");
+  await waitTrans(await deployedVaultErrorController.setErrors(vaultAddr, errorConfigs), "ErrorController.setErrors");
+  console.log("initBeforMainProcessLaunch.success");
+}
+
+async function initSupportGlpManager() {
+  console.log("initSupportGlpManager.start");
+  //配置GlpManager  true-不允许增减流动性
+  await waitTrans(await deployedGlpManager.setInPrivateMode(true), "GlpManager.setInPrivateMode");
+
+  //其它合约配置glpManager
+  await waitTrans(await deployedUSDG.addVault(glpManagerAddr), "USDG.addVault");
+  await waitTrans(await deployedGLP.setMinter(glpManagerAddr), "GLP.setMinter");
+  await waitTrans(await deployedVault.setInManagerMode(true), "vault.setInManagerMode");
+  await waitTrans(await deployedVault.setManager(glpManagerAddr, true), "vault.setManager");
+  console.log("initSupportGlpManager.success");
+}
+
+async function initSupportOrderBook() {
+  console.log("initSupportOrderBook.start");
+  await waitTrans(
+    await deployedOrderBook.initialize(routerAddr, vaultAddr, wethAddr, usdgAddr, minExecutionFee, minPurchaseTokenAmountUsd),
+    "orderBook.initialize"
+  );
+  console.log("initSupportOrderBook.success");
 }
 
 //升级staking合约
@@ -145,10 +194,19 @@ async function main() {
 
   //部署合约
   await deployContract();
-
+  //初始化金库
+  await initBeforMainProcessLaunch();
+  //配置GlpManager
+  await initSupportGlpManager();
+  //配置订单簿
+  await initSupportOrderBook();
   // 需要临时调用的接口在这里写
   // await tmpSet();
   console.log("deploy finish");
+}
+
+function parseU(value: number) {
+  return ethers.utils.parseUnits(String(value), usdtDecimal);
 }
 
 main()

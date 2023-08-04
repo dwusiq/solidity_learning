@@ -463,7 +463,7 @@ contract PositionRouter is BasePositionManager, IPositionRouter {
         return true;
     }
 
-    function cancelIncreasePosition(bytes32 _key, address payable _executionFeeReceiver) public nonReentrant returns (bool) {
+        function cancelIncreasePosition(bytes32 _key, address payable _executionFeeReceiver) public nonReentrant returns (bool) {
         IncreasePositionRequest memory request = increasePositionRequests[_key];
         // if the request was already executed or cancelled, return true so that the executeIncreasePositions loop will continue executing the next request
         if (request.account == address(0)) { return true; }

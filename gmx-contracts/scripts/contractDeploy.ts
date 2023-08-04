@@ -16,6 +16,14 @@ function sleep(ms: any) {
   }
 }
 
+//等待交易执行完之后，仍继续等待5秒
+async function waitTrans(trans: any, transDesc: any) {
+  console.log("%s start", transDesc);
+  await trans.wait();
+  await sleep(6000);
+  console.log("%s success", transDesc);
+}
+
 /**
  * @notice  合约部署基础函数
  * @param isUpgrade 是不是可升级合约 true-可升级合约 false-不可升级合约
@@ -23,12 +31,7 @@ function sleep(ms: any) {
  * @param selfAddress 合约自己的地址 为空时部署新的，否则只是将合约关联到该地址
  * @param params 合约部署的入参
  */
-async function baseDeploy(
-  isUpgrade: boolean,
-  contractName: string,
-  selfAddress: string,
-  params: any[]
-) {
+async function baseDeploy(isUpgrade: boolean, contractName: string, selfAddress: string, params: any[]) {
   const Contract = await ethers.getContractFactory(contractName);
   let deployedContract: any;
   if (!selfAddress || selfAddress == "") {
@@ -53,20 +56,12 @@ async function baseDeploy(
 }
 
 //默认的部署
-async function deploy(
-  contractName: string,
-  selfAddress: string,
-  params: any[]
-) {
+async function deploy(contractName: string, selfAddress: string, params: any[]) {
   return baseDeploy(false, contractName, selfAddress, params);
 }
 
 //可升级的部署
-async function upgradeDeploy(
-  contractName: string,
-  selfAddress: string,
-  params: any[]
-) {
+async function upgradeDeploy(contractName: string, selfAddress: string, params: any[]) {
   return baseDeploy(true, contractName, selfAddress, params);
 }
 
@@ -81,4 +76,4 @@ async function upgradeContract(contractName: string, selfAddress: string) {
   return upgraded;
 }
 
-export { deploy, upgradeDeploy, upgradeContract };
+export { deploy, waitTrans, sleep, upgradeDeploy, upgradeContract };
