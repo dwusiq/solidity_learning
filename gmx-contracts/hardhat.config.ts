@@ -16,9 +16,9 @@ const config: HardhatUserConfig = {
     testnetMumbai: {
       url: "https://rpc.ankr.com/polygon_mumbai",
       chainId: 80001,
-      gasPrice: 20000000000,
+      // gasPrice: 20000000000,
       accounts: [`${TEST_OWNER_KEY}`], //第一个owner,
-      timeout: 60000, //这里时间给长一点，不然容易超时
+      // timeout: 60000, //这里时间给长一点，不然容易超时
     },
   },
   solidity: {
@@ -32,8 +32,16 @@ const config: HardhatUserConfig = {
           },
         },
       },
+      {
+        version: "0.8.0",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        },
+      },
     ],
-    overrides: {},
   },
 };
 export default config;

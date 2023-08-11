@@ -1,4 +1,5 @@
 import { ethers, upgrades } from "hardhat";
+import { FactoryOptions } from "hardhat/types";
 let moment = require("moment");
 
 let isLocalTest = false; //是否是本地测试， true: 本地测试  false: 部署远程节点    如果本地测试则部署之后不会进行睡眠
@@ -31,8 +32,8 @@ async function waitTrans(trans: any, transDesc: any) {
  * @param selfAddress 合约自己的地址 为空时部署新的，否则只是将合约关联到该地址
  * @param params 合约部署的入参
  */
-async function baseDeploy(isUpgrade: boolean, contractName: string, selfAddress: string, params: any[]) {
-  const Contract = await ethers.getContractFactory(contractName);
+async function baseDeploy(isUpgrade: boolean, contractName: string, selfAddress: string, params: any[], options?: FactoryOptions) {
+  const Contract = await ethers.getContractFactory(contractName, options);
   let deployedContract: any;
   if (!selfAddress || selfAddress == "") {
     console.log(`deploy ${contractName} start`);
@@ -41,7 +42,7 @@ async function baseDeploy(isUpgrade: boolean, contractName: string, selfAddress:
         initializer: "initialize",
       });
     } else {
-      deployedContract = await Contract.deploy(params);
+      deployedContract = await Contract.deploy(...params);
     }
 
     await deployedContract.deployed();
@@ -56,13 +57,13 @@ async function baseDeploy(isUpgrade: boolean, contractName: string, selfAddress:
 }
 
 //默认的部署
-async function deploy(contractName: string, selfAddress: string, params: any[]) {
-  return baseDeploy(false, contractName, selfAddress, params);
+async function deploy(contractName: string, selfAddress: string, params: any[], options?: FactoryOptions) {
+  return baseDeploy(false, contractName, selfAddress, params, options);
 }
 
 //可升级的部署
-async function upgradeDeploy(contractName: string, selfAddress: string, params: any[]) {
-  return baseDeploy(true, contractName, selfAddress, params);
+async function upgradeDeploy(contractName: string, selfAddress: string, params: any[], options?: FactoryOptions) {
+  return baseDeploy(true, contractName, selfAddress, params, options);
 }
 
 /**
