@@ -77,4 +77,4 @@ async function upgradeContract(contractName: string, selfAddress: string) {
   return upgraded;
 }
 
-export { deploy, waitTrans, sleep, upgradeDeploy, upgradeContract };
+export { deploy, waitTrans, sleep, upgradeDeploy, upgradeContract,openLocalTest };

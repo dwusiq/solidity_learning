@@ -34,6 +34,7 @@ const fundingInterval = A_HOUR_SECONDS; //资金费率周期时长(秒)
 //orderBook
 const minPurchaseTokenAmountUsd = parseU(10); // min purchase token amount usd
 //PositionRouter
+const positionKeeper = deployerAddress; //TODO 生产根据实际情配置
 const minBlockDelayKeeper = 0; //头寸数据过多久才能被keeper操作
 const minTimeDelayPublic = 3 * A_MINUTES_SECONDS; //头寸数据过多久才能被任何用户操作
 const maxTimeDelay = 30 * A_MINUTES_SECONDS; //头寸数据有效时长
@@ -166,8 +167,6 @@ async function initBeforMainProcessLaunch() {
   // console.log("admin",await deployedTimelock.admin());
   // console.log("deployer",deployerAddress);
   // console.log("gov",await deployedVault.gov());
-  // //配置TimeLock
-  // await waitTrans(await deployedTimelock.setVaultUtils(vaultAddr,vaultUtilsAddr), "timelock.setVaultUtils");
 
   //配置GLP  true-只能白名单转账
   await waitTrans(await deployedGLP.setInPrivateTransferMode(true), "GLP.setInPrivateTransferMode");
@@ -226,6 +225,10 @@ async function initSupportPositionRouter() {
   await waitTrans(await deployedTimelock.setContractHandler(positionRouterAddr, true), "timelock.setContractHandler(positionRouter)");
   await waitTrans(await deployedPositionRouter.setGov(await deployedVault.gov()), "positionRouter.setGov"); //TODO 多签合约,暂用deployer,因此不需要设置
   await waitTrans(await deployedPositionRouter.setAdmin(deployerAddress), "positionRouter.setAdmin");
+
+  //配置keeper
+  await waitTrans(await deployedPositionRouter.setPositionKeeper(positionKeeper, true), "positionRouter.keeper");
+
   console.log("initSupportPositionRouter.success");
 }
 
@@ -259,10 +262,11 @@ async function configTokenPriceFeed() {
   console.log("configTokenPriceFeed.start");
 
   //TODO 暂不开放AMM,后续有必要才开放AMM
-  await waitTrans(await deployedVaultPriceFeed.setIsAmmEnabled(false), "VaultPriceFeed.setIsAmmEnabled");
+  // await waitTrans(await deployedVaultPriceFeed.setIsAmmEnabled(false), "VaultPriceFeed.setIsAmmEnabled");
 
   const isStrictStable = false; //是否是稳定币
   // await waitTrans(await deployedVaultPriceFeed.setTokenConfig(wethAddr, priceFeedEthUsdAddr, 8, isStrictStable), "VaultPriceFeed.setTokenConfig.eth");
+  // await waitTrans(await deployedVaultPriceFeed.setTokenConfig(AddressZero, priceFeedEthUsdAddr, 8, isStrictStable), "VaultPriceFeed.setTokenConfig.weth");
   console.log("configTokenPriceFeed.success");
 }
 
@@ -279,68 +283,34 @@ async function saveIdoUser() {
 
 //需要临时调用的接口
 async function tmpSet() {
+  // await waitTrans(await deployedPositionRouter.setPositionKeeper(positionKeeper,true), "positionRouter.keeper");
+
   let data: any;
 
-  // await waitTrans(await deployedVault.setPriceFeed(vaultPriceFeedAddr), "Vault");
+  //查询待执行的记录数
+  data = await deployedPositionRouter.getRequestQueueLengths();
+  console.log("getRequestQueueLengths", data.toString());
+  //执行用户的申请
+  const feeTo = deployer.address;
+  const endIndex = data[1];
+   await waitTrans(await deployedPositionRouter.executeIncreasePositions(endIndex, feeTo), "execute position request");
+  // //根据key的index查询key
+  // let key = await deployedPositionRouter.increasePositionRequestKeys(8);
+  // //根据key查询详情
+  // data = await deployedPositionRouter.increasePositionRequests(key);
+  // console.log("data", data.toString());
+  // console.log("path", data.path);
+  // console.log("indexToken", data.indexToken.toString());
 
-  // // data = await deployedVaultPriceFeed.getAmmPrice(wethAddr);
-  // // console.log("getPriceV1",data.toString());
-  // // data = await deployedVault.includeAmmPrice();
-  // // console.log("includeAmmPrice",data.toString());
-  // // data = await deployedVault.useSwapPricing();
-  // // console.log("useSwapPricing",data.toString());
-
-  // //  data = await deployedVaultPriceFeed.getPrimaryPrice(wethAddr,true);
-  // //   console.log("getPrimaryPrice",data.toString());
-  // data = await deployedVaultPriceFeed.getPriceV1(wethAddr, true, false);
-  // console.log("getPriceV1", data.toString());
-  // data = await deployedVaultPriceFeed.getPriceV2(wethAddr, true, false);
-  // console.log("getPriceV2", data.toString());
-  // data = await deployedVaultPriceFeed.getPrice(wethAddr, false, true, false);
-  // console.log("getPrice", data.toString());
-
-  // data = await deployedVault.priceFeed();
-  // console.log("priceFeed", data.toString());
-  // // data = await deployedVault.poolAmounts(wethAddr);
-  // // console.log("poolAmounts",data.toString());
-  // // data = await deployedVault.reservedAmounts(wethAddr);
-  // // console.log("reservedAmounts",data.toString());
-  // // data = await deployedVault.usdgAmounts(wethAddr);
-  // // console.log("usdgAmounts",data.toString());
-  // data = await deployedVault.getMinPrice(wethAddr);
-  // console.log("getMinPrice", data.toString());
-  // // data = await deployedVault.getMaxPrice(wethAddr);
-  // // console.log("getMaxPrice",data.toString());
-
-  // // data = await deployedVault.getRedemptionAmount(wethAddr,parseUSDG(10));
-  // // console.log("getRedemptionAmount",data.toString());
-  // // data = await deployedVault.tokenWeights(wethAddr);
-  // // console.log("tokenWeights",data.toString());
-  // // data = await deployedVault.bufferAmounts(wethAddr);
-  // // console.log("bufferAmounts",data.toString());
-  // // data = await deployedVault.maxUsdgAmounts(wethAddr);
-  // // console.log("maxUsdgAmounts",data.toString());
-  // // data = await deployedVault.maxUsdgAmounts(wethAddr);
-  // // console.log("maxUsdgAmounts",data.toString());
-
-  // // amounts[i * propsLength] = vault.poolAmounts(token);
-  // // amounts[i * propsLength + 1] = vault.reservedAmounts(token);
-  // // amounts[i * propsLength + 2] = vault.usdgAmounts(token);
-  // // amounts[i * propsLength + 3] = vault.getRedemptionAmount(token, _usdgAmount);
-  // // amounts[i * propsLength + 4] = vault.tokenWeights(token);
-  // // amounts[i * propsLength + 5] = vault.bufferAmounts(token);
-  // // amounts[i * propsLength + 6] = vault.maxUsdgAmounts(token);
-  // // amounts[i * propsLength + 7] = vault.globalShortSizes(token);
-  // // amounts[i * propsLength + 8] = positionManager.maxGlobalShortSizes(token);
-  // // amounts[i * propsLength + 9] = positionManager.maxGlobalLongSizes(token);
-  // // amounts[i * propsLength + 10] = vault.getMinPrice(token);
-  // // amounts[i * propsLength + 11] = vault.getMaxPrice(token);
-  // // amounts[i * propsLength + 12] = vault.guaranteedUsd(token);
-  // // amounts[i * propsLength + 13] = priceFeed.getPrimaryPrice(token, false);
-  // // amounts[i * propsLength + 14] = priceFeed.getPrimaryPrice(token, true);
-
-   data = await deployedVaultReader.getVaultTokenInfoV4(vaultAddr, positionRouterAddr, wethAddr, parseUSDG(100), [wethAddr]);
-  console.log("data",data.toString());
+  // //查询当前的头寸
+  // const account = "0x81fAD06f5B782bc61E93085126C4c73b113e433f";
+  // const collateralTokens = [AddressZero];
+  // const indexToken = ["0xd4589C11277d8d1A45D643D621CBF5e11e8b265f"];
+  // const isLong = [true];
+  // // data = await deployedReader.getPositions(vaultAddr, account, collateralTokens, indexToken, isLong);
+  // // console.log("reader.getPositions",data.toString());
+  // data = await deployedVault.getPosition(account, collateralTokens[0], indexToken[0], isLong[0]);
+  // console.log("getPosition",data.toString());
 }
 
 async function main() {
