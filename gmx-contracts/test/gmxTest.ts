@@ -96,9 +96,10 @@ let shortsTrackerTimelockAddr = "";
 let deployedPriceFeedEthUsd: any; //PriceFeeEthUSD
 let priceFeedEthUsdAddr = "";
 
+let user1: any;
 describe("===========================tifo test===========================", function () {
   beforeEach(async function () {
-    [deployer] = await ethers.getSigners();
+    [deployer, user1] = await ethers.getSigners();
     console.log("deployer", deployer.address);
 
     //开启测试环境，即在部署合约之后不会睡眠5秒
@@ -212,7 +213,6 @@ describe("===========================tifo test===========================", func
     console.log("initSupportOrderBook.success");
   });
 
-
   //参数初始化
   it("initSupportShortsTrackerTimelock.test", async function () {
     console.log("initSupportShortsTrackerTimelock.start");
@@ -274,6 +274,45 @@ describe("===========================tifo test===========================", func
     await waitTrans(await deployedVaultPriceFeed.setTokenConfig(AddressZero, priceFeedEthUsdAddr, 8, isStrictStable), "VaultPriceFeed.setTokenConfig.weth");
 
     console.log("initSupportPositionManager.success");
+  });
+
+  //喂价
+  it("setLatestAnswer.test", async function () {
+    await waitTrans(await deployedPriceFeedEthUsd.setLatestAnswer("2936309000000"), "riceFeed.setLatestAnswer");
+  });
+
+  //申请买入看多的订单
+  it("createIncreasePosition.test", async function () {
+    //查询价格
+    const lastAnswer = await deployedPriceFeedEthUsd.latestAnswer();
+    //查询执行手续费
+    const executeFee = await deployedPositionRouter.minExecutionFee();
+    console.log("executeFee", executeFee.toString());
+
+    //下单
+    const path = [wethAddr];
+    const indexToken = wethAddr;
+    const minOut = 0;
+    const sizeDelta = ethers.utils.parseUnits("58722952", 26);
+    const isLong = true;
+    const acceptablePrice = lastAnswer;
+    const executionFee = executeFee;
+    const referralCode = "0x0000000000000000000000000000000000000000000000000000000000000000";
+    const callbackTarget = AddressZero;
+
+    await waitTrans(
+      await deployedPositionRouter
+        .connect(user1)
+        .createIncreasePositionETH(path, indexToken, minOut, sizeDelta, isLong, acceptablePrice, executionFee, referralCode, callbackTarget),
+      "PositionRouter.createIncreasePositionETH"
+    );
+  });
+
+  //执行看多的衍生品订单
+  it("createIncreasePosition.test", async function () {
+    const requestQueueLengths = await deployedPositionRouter.getRequestQueueLengths();
+    console.log("getRequestQueueLengths", requestQueueLengths.toString());
+    
   });
 });
 

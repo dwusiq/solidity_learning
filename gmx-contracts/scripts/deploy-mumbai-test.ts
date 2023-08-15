@@ -286,31 +286,33 @@ async function tmpSet() {
   // await waitTrans(await deployedPositionRouter.setPositionKeeper(positionKeeper,true), "positionRouter.keeper");
 
   let data: any;
+  data = await deployedPriceFeedEthUsd.latestAnswer();
+  console.log("latestAnswer",data.toString());
 
-  //查询待执行的记录数
-  data = await deployedPositionRouter.getRequestQueueLengths();
-  console.log("getRequestQueueLengths", data.toString());
-  //执行用户的申请
-  const feeTo = deployer.address;
-  const endIndex = data[1];
-   await waitTrans(await deployedPositionRouter.executeIncreasePositions(endIndex, feeTo), "execute position request");
-  // //根据key的index查询key
-  // let key = await deployedPositionRouter.increasePositionRequestKeys(8);
-  // //根据key查询详情
-  // data = await deployedPositionRouter.increasePositionRequests(key);
-  // console.log("data", data.toString());
-  // console.log("path", data.path);
-  // console.log("indexToken", data.indexToken.toString());
+  // //查询待执行的记录数
+  // data = await deployedPositionRouter.getRequestQueueLengths();
+  // console.log("getRequestQueueLengths", data.toString());
+  // //执行用户的申请
+  // const feeTo = deployer.address;
+  // const endIndex = data[1];
+  //  await waitTrans(await deployedPositionRouter.executeIncreasePositions(endIndex, feeTo), "execute position request");
+  // // //根据key的index查询key
+  // // let key = await deployedPositionRouter.increasePositionRequestKeys(8);
+  // // //根据key查询详情
+  // // data = await deployedPositionRouter.increasePositionRequests(key);
+  // // console.log("data", data.toString());
+  // // console.log("path", data.path);
+  // // console.log("indexToken", data.indexToken.toString());
 
-  // //查询当前的头寸
-  // const account = "0x81fAD06f5B782bc61E93085126C4c73b113e433f";
-  // const collateralTokens = [AddressZero];
-  // const indexToken = ["0xd4589C11277d8d1A45D643D621CBF5e11e8b265f"];
-  // const isLong = [true];
-  // // data = await deployedReader.getPositions(vaultAddr, account, collateralTokens, indexToken, isLong);
-  // // console.log("reader.getPositions",data.toString());
-  // data = await deployedVault.getPosition(account, collateralTokens[0], indexToken[0], isLong[0]);
-  // console.log("getPosition",data.toString());
+  // // //查询当前的头寸
+  // // const account = "0x81fAD06f5B782bc61E93085126C4c73b113e433f";
+  // // const collateralTokens = [AddressZero];
+  // // const indexToken = ["0xd4589C11277d8d1A45D643D621CBF5e11e8b265f"];
+  // // const isLong = [true];
+  // // // data = await deployedReader.getPositions(vaultAddr, account, collateralTokens, indexToken, isLong);
+  // // // console.log("reader.getPositions",data.toString());
+  // // data = await deployedVault.getPosition(account, collateralTokens[0], indexToken[0], isLong[0]);
+  // // console.log("getPosition",data.toString());
 }
 
 async function main() {
