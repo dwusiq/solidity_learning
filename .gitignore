@@ -6,3 +6,4 @@ olympus-contracts/V1/node_modules/
 olympus-contracts/V1/artifacts/
 olympus-contracts/V1/cache/
 olympus-contracts/V1/package-lock.json
+/gmx-contracts/.env
