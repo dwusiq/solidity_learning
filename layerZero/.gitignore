@@ -1,0 +1,16 @@
+
+cache/
+node_modules/
+node_modules.init/
+yarn.lock
+yarn-error.log
+
+/artifacts/@nomiclabs
+/artifacts/@openzeppelin
+/artifacts/build-info
+*.dbg.json
+
+package-lock.json
+/artifacts/
+/env.json
+/.env
