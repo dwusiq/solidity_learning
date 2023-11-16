@@ -21,19 +21,12 @@ export async function initContract(sourceParam: DefaultParam, sourceContract: Co
   c = sourceContract;
 }
 
-export function parseEther(value: number | string) {
-  return ethers.utils.parseUnits(String(value), p.ethDecimal);
-}
+// export function parseEther(value: number | string) {
+//   return ethers.utils.parseUnits(String(value), p.ethDecimal);
+// }
 
-export function parseU(value: number | string) {
-  return ethers.utils.parseUnits(String(value), p.usdtDecimal);
-}
-
-export function parseArcToken(value: number | string) {
-  return ethers.utils.parseUnits(String(value), p.arcTokenDecimal);
-}
-export function parseSunToken(value: number | string) {
-  return ethers.utils.parseUnits(String(value), p.sunTokenDecimal);
+export function parseLayerZeroTestCoin(value: number | string) {
+  return ethers.utils.parseUnits(String(value), p.layerZeroTestCoinDecimal);
 }
 
 export function multiDayTimes(days: number) {

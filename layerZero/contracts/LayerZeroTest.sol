@@ -11,7 +11,6 @@ import "./lzApp/NonblockingLzApp.sol";
     LayerZero Goerli
       lzChainId:10121 lzEndpoint:0xbfD2135BFfbb0B5378b56643c2Df8a87552Bfa23
 */
-
 contract LayerZeroTest is NonblockingLzApp {
     string public data = "empty message";
     uint16 destChainId;
